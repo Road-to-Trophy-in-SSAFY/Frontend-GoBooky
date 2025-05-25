@@ -1,8 +1,7 @@
 <!-- 쓰레드 전체 목록 조회 view -->
 <template>
   <div>
-    <div class="header-actions">
-    </div>
+    <div class="header-actions"></div>
 
     <!-- 카테고리 필터 -->
     <div class="category-filter">
@@ -35,8 +34,8 @@
           <p>책: {{ thread.book.title }}</p>
           <p>카테고리: {{ thread.book.category_name }}</p>
           <div class="thread-actions">
-          <button @click="goToThreadDetail(thread.id)" class="detail-btn">자세히 보기</button>
-        </div>
+            <button @click="goToThreadDetail(thread.id)" class="detail-btn">자세히 보기</button>
+          </div>
           <button @click.stop="toggleLike(thread)" class="like-btn">
             <span v-if="thread.liked">❤️</span>
             <span v-else>🤍</span>
@@ -53,25 +52,28 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useThreadStore } from '@/stores/thread'
 import { useRouter } from 'vue-router'
 import { categoriesData } from '@/stores/categoriesData.js'
+import { useThreads } from '@/composables/useThreads'
 
-const threadStore = useThreadStore()
+// 지침에 따른 Composables 사용
+const { threads, fetchThreads, toggleLike: toggleThreadLike } = useThreads()
 const router = useRouter()
-const threads = ref([])
 const categories = categoriesData
 const selectedCategory = ref(null)
 const API_URL = 'http://127.0.0.1:8000'
-const defaultImageUrl = '/default_thread_image.jpg'
 
 onMounted(async () => {
   await loadThreads()
 })
 
 const loadThreads = async () => {
-  await threadStore.getThreads()
-  threads.value = threadStore.threads
+  try {
+    await fetchThreads()
+    console.log('✅ [ThreadListView] 쓰레드 목록 로드 완료')
+  } catch (error) {
+    console.error('❌ [ThreadListView] 쓰레드 목록 로드 실패:', error)
+  }
 }
 
 const getThreadImage = (thread) => {
@@ -104,10 +106,10 @@ const goToThreadDetail = (threadId) => {
 
 const toggleLike = async (thread) => {
   try {
-    await threadStore.likeThread(thread.id)
-    // 스토어의 최신 데이터로 로컬 상태 업데이트
-    threads.value = threadStore.threads
-  } catch {
+    await toggleThreadLike(thread.id)
+    console.log('✅ [ThreadListView] 좋아요 토글 성공:', thread.id)
+  } catch (error) {
+    console.error('❌ [ThreadListView] 좋아요 토글 실패:', error)
     alert('로그인 후 이용 가능합니다.')
   }
 }

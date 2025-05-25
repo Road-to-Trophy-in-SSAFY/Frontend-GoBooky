@@ -119,7 +119,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import axios from '@/services/axios'
+import api from '@/api'
 import Modal from '@/components/ui/Modal.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -157,7 +157,7 @@ const fetchProfile = async () => {
   }
   try {
     loading.value = true
-    const res = await axios.get(`/auth/profile/${username}/`)
+    const res = await api.get(`/auth/auth/profile/${username}/`)
     log('fetchProfile 성공:', res.data)
     profile.value = res.data
     editableProfile.value = { ...res.data, category_ids: res.data.categories.map((cat) => cat.id) }
@@ -177,7 +177,7 @@ const fetchProfile = async () => {
 
 const fetchCategories = async () => {
   try {
-    const res = await axios.get('/auth/categories/')
+    const res = await api.get('/auth/auth/categories/')
     log('fetchCategories 성공:', res.data)
     allCategories.value = res.data
   } catch (err) {
@@ -285,7 +285,7 @@ const saveProfile = async () => {
   }
 
   try {
-    const res = await axios.patch(`/auth/profile/${profile.value.username}/`, formData, {
+    const res = await api.patch(`/auth/auth/profile/${profile.value.username}/`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -301,7 +301,7 @@ const saveProfile = async () => {
 
 const toggleFollow = async () => {
   try {
-    const res = await axios.post(`/auth/profile/${profile.value.username}/follow/`)
+    const res = await api.post(`/auth/auth/profile/${profile.value.username}/follow/`)
     profile.value.is_following = res.data.is_following
     profile.value.followers_count = res.data.followers_count
     modalText.value = res.data.is_following ? '팔로우 했습니다.' : '팔로우를 해제했습니다.'

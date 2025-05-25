@@ -285,15 +285,27 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
-import * as yup from 'yup'
 import Modal from '../ui/Modal.vue'
 import SanitizedInput from '../common/SanitizedInput.vue'
-import axios from '@/services/axios'
 import { useRouter } from 'vue-router'
+import { useMultiStepForm } from '@/composables/useMultiStepForm'
+import { useValidation, combinedSchemas } from '@/composables/useValidation'
+import { authAPI } from '@/api/auth'
 
 const router = useRouter()
-const step = ref(0)
+
+// 지침에 따른 멀티스텝 폼 설정
 const stepLabels = ['이메일 입력', '이메일 인증', '기본 정보', '독서 정보', '완료']
+const stepConfigs = stepLabels.map((label, index) => ({
+  id: index,
+  title: label,
+  required: index < 4, // 마지막 단계는 완료 단계
+}))
+
+const { currentStep, isLastStep, nextStep } = useMultiStepForm(stepConfigs)
+
+// 지침에 따른 검증 시스템 - 기본 스키마로 초기화
+const { validate, clearErrors } = useValidation(combinedSchemas.signup)
 
 // 폼 상태를 하나의 객체로 통합
 const formState = ref({
@@ -332,8 +344,6 @@ const formState = ref({
 })
 
 // computed 속성으로 자주 사용되는 값들 캐싱
-const currentStep = computed(() => step.value)
-const isLastStep = computed(() => step.value === 4)
 const canProceed = computed(() => {
   switch (currentStep.value) {
     case 0: {
@@ -363,45 +373,21 @@ const canProceed = computed(() => {
   }
 })
 
-// 유효성 검사 스키마
-const schemas = [
-  yup.object({
-    email: yup.string().email('이메일 형식이 올바르지 않습니다.').required('필수 입력'),
-    password: yup
-      .string()
-      .min(8, '비밀번호는 8자 이상이어야 합니다.')
-      .max(32, '비밀번호는 32자 이하여야 합니다.')
-      .matches(/[a-z]/, '소문자를 포함해야 합니다.')
-      .matches(/[A-Z]/, '대문자를 포함해야 합니다.')
-      .matches(/[0-9]/, '숫자를 포함해야 합니다.')
-      .matches(/[!"#$%&'()*+,-./:;<=>?@[\\\]^_`{|}~]/, '특수문자를 포함해야 합니다.')
-      .required('필수 입력'),
-  }),
-  yup.object({}),
-  yup.object({
-    username: yup
-      .string()
-      .min(2, '닉네임은 2자 이상이어야 합니다.')
-      .max(20, '닉네임은 20자 이하여야 합니다.')
-      .required('필수 입력'),
-    first_name: yup
-      .string()
-      .min(1, '이름은 1자 이상이어야 합니다.')
-      .max(20, '이름은 20자 이하여야 합니다.')
-      .required('필수 입력'),
-    last_name: yup
-      .string()
-      .min(1, '성은 1자 이상이어야 합니다.')
-      .max(20, '성은 20자 이하여야 합니다.')
-      .required('필수 입력'),
-    gender: yup.string().required('성별을 선택해주세요'),
-  }),
-  yup.object({
-    weekly_read_time: yup.number().nullable(),
-    yearly_read_count: yup.number().nullable(),
-    category_ids: yup.array().min(1, '최소 하나의 관심 장르를 선택해주세요').required('필수 입력'),
-  }),
-]
+// 지침에 따른 단계별 검증 스키마 매핑
+const getSchemaForStep = (step) => {
+  switch (step) {
+    case 0:
+      return combinedSchemas.signupStep1
+    case 1:
+      return null // 이메일 인증은 별도 처리
+    case 2:
+      return combinedSchemas.signupStep2
+    case 3:
+      return combinedSchemas.signupStep3
+    default:
+      return null
+  }
+}
 
 // 에러 처리 유틸리티 함수
 const handleError = (err) => {
@@ -438,15 +424,26 @@ const startResendTimer = () => {
 const registerUser = async () => {
   try {
     formState.value.loading.submit = true
-    await schemas[0].validate(formState.value.form, { abortEarly: false })
-    const res = await axios.post('/auth/register/', {
+    clearErrors()
+
+    // 지침에 따른 검증 - 1단계는 signupStep1 스키마 사용
+    const stepSchema = combinedSchemas.signupStep1
+    const { validate: stepValidate } = useValidation(stepSchema)
+    const isValid = await stepValidate(formState.value.form)
+    if (!isValid) {
+      console.log('❌ [MultiStepSignup] 1단계 검증 실패')
+      return
+    }
+
+    const res = await authAPI.register({
       email: formState.value.form.email,
       password: formState.value.form.password,
     })
-    if (res.data?.uuid) {
-      formState.value.verification.uuid = res.data.uuid
+
+    if (res.uuid) {
+      formState.value.verification.uuid = res.uuid
       formState.value.modal.text = '이메일로 인증 링크가 발송되었습니다. 메일함을 확인해주세요.'
-      step.value = 1
+      nextStep()
       startResendTimer()
     }
   } catch (err) {
@@ -463,10 +460,10 @@ const checkEmailVerified = async () => {
   }
   try {
     formState.value.loading.check = true
-    const res = await axios.post('/auth/register/verify/', {
+    const res = await authAPI.verifyEmail({
       uuid: formState.value.verification.uuid,
     })
-    if (res.data.detail?.includes('완료')) {
+    if (res.detail?.includes('완료')) {
       formState.value.verification.verified = true
       formState.value.modal.text = '이메일 인증이 완료되었습니다! 다음 단계로 진행할 수 있습니다.'
     } else {
@@ -488,10 +485,12 @@ const resendEmail = async () => {
   }
   try {
     formState.value.loading.resend = true
-    await axios.post('/auth/resend-email/', { email: formState.value.form.email })
+    await authAPI.resendEmail({ email: formState.value.form.email })
     formState.value.modal.text = '인증 이메일이 재발송되었습니다.'
     startResendTimer()
+    console.log('✅ [MultiStepSignup] 이메일 재발송 성공')
   } catch (err) {
+    console.error('❌ [MultiStepSignup] 이메일 재발송 실패:', err)
     handleError(err)
   } finally {
     formState.value.loading.resend = false
@@ -501,18 +500,33 @@ const resendEmail = async () => {
 const completeRegistration = async () => {
   try {
     formState.value.loading.submit = true
-    await schemas[3].validate(formState.value.form, { abortEarly: false })
-    await axios.patch('/auth/register/complete/', {
+    clearErrors()
+
+    // 지침에 따른 검증 - 3단계는 signupStep3 스키마 사용
+    const stepSchema = combinedSchemas.signupStep3
+    const { validate: stepValidate } = useValidation(stepSchema)
+    const isValid = await stepValidate(formState.value.form)
+    if (!isValid) {
+      console.log('❌ [MultiStepSignup] 3단계 검증 실패')
+      return
+    }
+
+    await authAPI.completeRegistration({
       uuid: formState.value.verification.uuid,
       ...formState.value.form,
     })
-    step.value = 4
+
+    nextStep() // 4단계로 이동
     formState.value.loading.redirect = true
     formState.value.modal.text = '회원가입이 완료되었습니다! 로그인 페이지로 이동합니다.'
+
     setTimeout(() => {
       router.push('/login')
     }, 2000)
+
+    console.log('✅ [MultiStepSignup] 회원가입 완료')
   } catch (err) {
+    console.error('❌ [MultiStepSignup] 회원가입 완료 실패:', err)
     handleError(err)
   } finally {
     formState.value.loading.submit = false
@@ -527,19 +541,23 @@ const checkNicknameAvailability = async () => {
   }
   try {
     formState.value.loading.nicknameCheck = true
-    // 닉네임 중복 확인 API 호출
-    const res = await axios.post('/auth/check-nickname/', {
+
+    // 지침에 따른 API 호출
+    const res = await authAPI.checkNickname({
       username: formState.value.form.username,
     })
-    if (res.data.available) {
+
+    if (res.available) {
       formState.value.nicknameCheckMessage = '사용 가능한 닉네임입니다.'
       formState.value.isNicknameAvailable = true
+      console.log('✅ [MultiStepSignup] 닉네임 사용 가능:', formState.value.form.username)
     } else {
       formState.value.nicknameCheckMessage = '이미 사용 중인 닉네임입니다.'
       formState.value.isNicknameAvailable = false
+      console.log('ℹ️ [MultiStepSignup] 닉네임 중복:', formState.value.form.username)
     }
   } catch (err) {
-    // 에러 발생 시 메시지 표시 및 상태 업데이트
+    console.error('❌ [MultiStepSignup] 닉네임 중복 확인 실패:', err)
     handleError(err)
     formState.value.nicknameCheckMessage = '닉네임 중복 확인 중 오류가 발생했습니다.'
     formState.value.isNicknameAvailable = false
@@ -560,7 +578,7 @@ const handleModalClose = () => {
 
   // 특정 에러 메시지인 경우 회원가입 초기화
   if (modalText === '해당 이메일로 대기 중인 인증이 없습니다.') {
-    step.value = 0 // 첫 번째 스텝으로 이동
+    currentStep.value = 0 // 첫 번째 스텝으로 이동
     // 폼 상태 및 검증 상태 초기화
     formState.value.form = {
       email: '',
@@ -596,7 +614,8 @@ const handleModalClose = () => {
 
 // 단계별 처리 함수
 const handleNext = async () => {
-  formState.value.errors = {}
+  clearErrors()
+
   switch (currentStep.value) {
     case 0:
       await registerUser()
@@ -606,13 +625,22 @@ const handleNext = async () => {
         formState.value.modal.text = '이메일 인증을 완료해 주세요.'
         return
       }
-      step.value = 2
+      nextStep()
       break
     case 2:
       try {
         formState.value.loading.submit = true
-        await schemas[2].validate(formState.value.form, { abortEarly: false })
-        step.value = 3
+
+        // 지침에 따른 검증 - 2단계는 signupStep2 스키마 사용
+        const stepSchema = combinedSchemas.signupStep2
+        const { validate: stepValidate } = useValidation(stepSchema)
+        const isValid = await stepValidate(formState.value.form)
+        if (!isValid) {
+          console.log('❌ [MultiStepSignup] 2단계 검증 실패')
+          return
+        }
+
+        nextStep()
       } catch (err) {
         handleError(err)
       } finally {
@@ -637,9 +665,11 @@ const toggleCategory = (categoryId) => {
 
 const fetchCategories = async () => {
   try {
-    const res = await axios.get('/auth/categories/')
-    formState.value.categories = res.data
+    const res = await authAPI.getCategories()
+    formState.value.categories = res
+    console.log('✅ [MultiStepSignup] 카테고리 목록 로드 완료:', res.length)
   } catch (err) {
+    console.error('❌ [MultiStepSignup] 카테고리 목록 로드 실패:', err)
     handleError(err)
   }
 }
@@ -655,14 +685,14 @@ onMounted(async () => {
     // Instead of calling checkEmailVerified, send a GET request to the verification endpoint
     try {
       formState.value.loading.check = true
-      const res = await axios.get(`/auth/verify-email/${uuid}/`) // Send GET request
-      if (res.status === 200) {
+      const res = await authAPI.verifyEmailByUUID(uuid) // Send GET request
+      if (res.detail) {
         formState.value.verification.verified = true
-        formState.value.modal.text = res.data.detail || '이메일 인증이 완료되었습니다!'
-        step.value = 1 // Move to verification step if needed
+        formState.value.modal.text = res.detail || '이메일 인증이 완료되었습니다!'
+        currentStep.value = 1 // Move to verification step if needed
       } else {
         // Handle other status codes if necessary
-        formState.value.modal.text = res.data?.detail || '이메일 인증 중 오류가 발생했습니다.'
+        formState.value.modal.text = res?.detail || '이메일 인증 중 오류가 발생했습니다.'
       }
     } catch (err) {
       // Handle errors from the GET request

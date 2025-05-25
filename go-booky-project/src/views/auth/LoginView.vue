@@ -62,24 +62,21 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { useAuthStore } from '@/stores/auth'
+import { useAuth } from '@/composables/useAuth'
 import { useRouter } from 'vue-router'
 import SanitizedInput from '@/components/common/SanitizedInput.vue'
 import Modal from '@/components/ui/Modal.vue'
-import * as yup from 'yup'
+import { useValidation, combinedSchemas } from '@/composables/useValidation'
 
-const auth = useAuthStore()
+const { login, error: authError } = useAuth()
 const router = useRouter()
 const email = ref('')
 const password = ref('')
 const modalText = ref('')
 const showPassword = ref(false)
-const errors = ref({})
 
-const schema = yup.object({
-  email: yup.string().email('이메일 형식이 올바르지 않습니다.').required('필수 입력'),
-  password: yup.string().required('필수 입력'),
-})
+// 지침에 따른 검증 시스템 사용
+const { errors, validate, clearErrors } = useValidation(combinedSchemas.login)
 
 // 컴포넌트 마운트 시 localStorage에서 이메일 복원
 onMounted(() => {
@@ -96,35 +93,33 @@ function togglePassword() {
 }
 
 const handleSubmit = async () => {
-  errors.value = {}
-  try {
-    // 유효성 검사
-    await schema.validate({ email: email.value, password: password.value }, { abortEarly: false })
+  clearErrors()
 
-    // 로그인 시도
-    const response = await auth.login(email.value, password.value)
+  // 지침에 따른 유효성 검사
+  const isValid = await validate({
+    email: email.value,
+    password: password.value,
+  })
 
-    // 로그인 성공 시에만 성공 메시지 표시
-    if (response) {
-      modalText.value = '로그인 성공!'
-      setTimeout(() => {
-        router.push('/') // 홈페이지로 리다이렉트
-      }, 500)
-      password.value = '' // 로그인 성공 후 비밀번호 초기화
-    }
-  } catch (err) {
-    if (err.name === 'ValidationError') {
-      // 폼 유효성 검사 에러
-      err.inner.forEach((e) => {
-        errors.value[e.path] = e.message
-      })
-    } else {
-      // 백엔드 에러 처리
-      const errorMessage =
-        err.response?.data?.detail || '이메일 혹은 비밀번호가 틀렸습니다. 다시 시도해주세요.'
-      modalText.value = errorMessage
-      password.value = '' // 로그인 실패 시 비밀번호 초기화
-    }
+  if (!isValid) {
+    console.log('❌ [LoginView] 폼 검증 실패')
+    return
+  }
+
+  // 로그인 시도
+  const success = await login(email.value, password.value)
+
+  if (success) {
+    // 로그인 성공 시 성공 메시지 표시
+    modalText.value = '로그인 성공!'
+    setTimeout(() => {
+      router.push('/') // 홈페이지로 리다이렉트
+    }, 500)
+    password.value = '' // 로그인 성공 후 비밀번호 초기화
+  } else {
+    // 로그인 실패 시 에러 메시지 표시 (항상 한국어로 통일)
+    modalText.value = '이메일 혹은 비밀번호를 잘못 입력하였습니다. 다시 시도해주세요.'
+    password.value = '' // 로그인 실패 시 비밀번호 초기화
   }
 }
 </script>

@@ -1,0 +1,310 @@
+import { ref, computed } from 'vue'
+import { threadsAPI } from '@/api/threads'
+import { useApi } from './useApi'
+import { useThreadStore } from '@/stores/thread'
+
+/**
+ * 지침에 따른 쓰레드 Composable
+ * - 쓰레드 관련 로직 캡슐화
+ * - CRUD 작업 지원
+ * - 좋아요 기능 포함
+ * - 스토어와 연동하여 상태 관리
+ */
+export function useThreads() {
+  const { execute, isLoading, error, clearError, reset } = useApi()
+  const threadStore = useThreadStore()
+
+  // 스토어에서 상태 가져오기
+  const threads = computed(() => threadStore.threads)
+  const selectedThread = computed(() => threadStore.threadDetail)
+  const pagination = computed(() => threadStore.pagination)
+
+  // 계산된 속성
+  const hasThreads = computed(() => threadStore.hasThreads)
+  const isFirstPage = computed(() => pagination.value.page === 1)
+  const isLastPage = computed(() => pagination.value.page === pagination.value.totalPages)
+
+  /**
+   * 쓰레드 목록 조회
+   * @param {Object} params 쿼리 파라미터
+   * @returns {Promise} 쓰레드 목록
+   */
+  const fetchThreads = async (params = {}) => {
+    try {
+      const response = await execute(() => threadsAPI.getThreads(params))
+
+      // 스토어에 데이터 저장
+      if (response.results) {
+        // 페이지네이션이 있는 경우
+        threadStore.setThreads(response.results)
+        threadStore.setPagination({
+          page: params.page || 1,
+          totalPages: Math.ceil(response.count / (params.page_size || 10)),
+          totalCount: response.count,
+          hasNext: Boolean(response.next),
+          hasPrevious: Boolean(response.previous),
+        })
+      } else {
+        // 페이지네이션이 없는 경우
+        threadStore.setThreads(response)
+        threadStore.setPagination({
+          page: 1,
+          totalPages: 1,
+          totalCount: response.length,
+          hasNext: false,
+          hasPrevious: false,
+        })
+      }
+
+      return response
+    } catch (err) {
+      console.error('❌ [useThreads] 쓰레드 목록 조회 실패:', err)
+      throw err
+    }
+  }
+
+  /**
+   * 쓰레드 상세 조회
+   * @param {number} threadId 쓰레드 ID
+   * @returns {Promise} 쓰레드 상세 정보
+   */
+  const fetchThread = async (threadId) => {
+    try {
+      const response = await execute(() => threadsAPI.getThread(threadId))
+      threadStore.setThreadDetail(response)
+      return response
+    } catch (err) {
+      console.error('❌ [useThreads] 쓰레드 상세 조회 실패:', err)
+      throw err
+    }
+  }
+
+  /**
+   * 쓰레드 생성
+   * @param {Object} threadData 쓰레드 데이터
+   * @returns {Promise} 생성된 쓰레드
+   */
+  const createThread = async (threadData) => {
+    try {
+      const response = await execute(() => threadsAPI.createThread(threadData))
+
+      // 스토어에 새 쓰레드 추가
+      threadStore.addThread(response)
+
+      console.log('✅ [useThreads] 쓰레드 생성 성공:', response.id)
+      return response
+    } catch (err) {
+      console.error('❌ [useThreads] 쓰레드 생성 실패:', err)
+      throw err
+    }
+  }
+
+  /**
+   * 쓰레드 수정
+   * @param {number} threadId 쓰레드 ID
+   * @param {Object} threadData 수정할 데이터
+   * @returns {Promise} 수정된 쓰레드
+   */
+  const updateThread = async (threadId, threadData) => {
+    try {
+      const response = await execute(() => threadsAPI.updateThread(threadId, threadData))
+
+      // 스토어에서 쓰레드 업데이트
+      threadStore.updateThread(threadId, response)
+
+      console.log('✅ [useThreads] 쓰레드 수정 성공:', threadId)
+      return response
+    } catch (err) {
+      console.error('❌ [useThreads] 쓰레드 수정 실패:', err)
+      throw err
+    }
+  }
+
+  /**
+   * 쓰레드 삭제
+   * @param {number} threadId 쓰레드 ID
+   * @returns {Promise} 삭제 응답
+   */
+  const deleteThread = async (threadId) => {
+    try {
+      const response = await execute(() => threadsAPI.deleteThread(threadId))
+
+      // 스토어에서 쓰레드 삭제
+      threadStore.removeThread(threadId)
+
+      console.log('✅ [useThreads] 쓰레드 삭제 성공:', threadId)
+      return response
+    } catch (err) {
+      console.error('❌ [useThreads] 쓰레드 삭제 실패:', err)
+      throw err
+    }
+  }
+
+  /**
+   * 쓰레드 좋아요/좋아요 취소
+   * @param {number} threadId 쓰레드 ID
+   * @returns {Promise} 좋아요 상태
+   */
+  const toggleLike = async (threadId) => {
+    try {
+      const response = await execute(() => threadsAPI.toggleLike(threadId))
+
+      // 스토어에서 좋아요 상태 업데이트
+      threadStore.updateThreadLike(threadId, response.liked, response.likes_count)
+
+      console.log('✅ [useThreads] 좋아요 토글 성공:', {
+        threadId,
+        liked: response.liked,
+        action: response.action,
+      })
+
+      return response
+    } catch (err) {
+      console.error('❌ [useThreads] 좋아요 토글 실패:', err)
+      throw err
+    }
+  }
+
+  /**
+   * 다음 페이지 로드
+   * @returns {Promise} 다음 페이지 데이터
+   */
+  const loadNextPage = async () => {
+    if (!pagination.value.hasNext) return
+
+    const nextPage = pagination.value.page + 1
+    return fetchThreads({ page: nextPage })
+  }
+
+  /**
+   * 이전 페이지 로드
+   * @returns {Promise} 이전 페이지 데이터
+   */
+  const loadPreviousPage = async () => {
+    if (!pagination.value.hasPrevious) return
+
+    const previousPage = pagination.value.page - 1
+    return fetchThreads({ page: previousPage })
+  }
+
+  /**
+   * 특정 페이지 로드
+   * @param {number} page 페이지 번호
+   * @returns {Promise} 페이지 데이터
+   */
+  const loadPage = async (page) => {
+    return fetchThreads({ page })
+  }
+
+  /**
+   * 선택된 쓰레드 설정
+   * @param {Object} thread 쓰레드 객체
+   */
+  const setSelectedThread = (thread) => {
+    threadStore.setThreadDetail(thread)
+  }
+
+  /**
+   * 상태 초기화
+   */
+  const resetThreads = () => {
+    threadStore.reset()
+    reset()
+  }
+
+  return {
+    // 상태
+    threads,
+    selectedThread,
+    pagination,
+    isLoading,
+    error,
+
+    // 계산된 속성
+    hasThreads,
+    isFirstPage,
+    isLastPage,
+
+    // 메서드
+    fetchThreads,
+    fetchThread,
+    createThread,
+    updateThread,
+    deleteThread,
+    toggleLike,
+    loadNextPage,
+    loadPreviousPage,
+    loadPage,
+    setSelectedThread,
+    resetThreads,
+    clearError,
+  }
+}
+
+/**
+ * 단일 쓰레드 관리를 위한 Composable
+ * @param {number} threadId 쓰레드 ID
+ * @returns {Object} 쓰레드 관련 상태 및 메서드
+ */
+export function useThread(threadId) {
+  const { execute, isLoading, error, clearError } = useApi()
+  const thread = ref(null)
+
+  /**
+   * 쓰레드 정보 로드
+   */
+  const loadThread = async () => {
+    if (!threadId) return
+
+    try {
+      const response = await execute(() => threadsAPI.getThread(threadId))
+      thread.value = response
+      return response
+    } catch (err) {
+      console.error('❌ [useThread] 쓰레드 로드 실패:', err)
+      throw err
+    }
+  }
+
+  /**
+   * 쓰레드 정보 새로고침
+   */
+  const refreshThread = async () => {
+    return loadThread()
+  }
+
+  /**
+   * 쓰레드 좋아요 토글
+   */
+  const toggleLike = async () => {
+    if (!threadId) return
+
+    try {
+      const response = await execute(() => threadsAPI.toggleLike(threadId))
+
+      // 쓰레드 상태 업데이트
+      if (thread.value) {
+        thread.value.liked = response.liked
+        thread.value.likes_count = response.likes_count
+      }
+
+      return response
+    } catch (err) {
+      console.error('❌ [useThread] 좋아요 토글 실패:', err)
+      throw err
+    }
+  }
+
+  return {
+    // 상태
+    thread,
+    isLoading,
+    error,
+
+    // 메서드
+    loadThread,
+    refreshThread,
+    toggleLike,
+    clearError,
+  }
+}

@@ -9,10 +9,10 @@
     &nbsp;|&nbsp;
     <RouterLink :to="{ name: 'threads' }">Threads</RouterLink>
     &nbsp;|&nbsp;
-    <template v-if="auth.isAuthenticated">
+    <template v-if="isAuthenticated">
       <RouterLink
-        :to="{ name: 'Profile', params: { username: auth.user?.username } }"
-        v-if="auth.user?.username"
+        :to="{ name: 'Profile', params: { username: user?.username } }"
+        v-if="user?.username"
       >
         <button>마이페이지</button>
       </RouterLink>
@@ -48,13 +48,14 @@
 </template>
 
 <script setup>
-import { useAuthStore } from '@/stores/auth'
 import { ref } from 'vue'
 import { useRouter, RouterLink, RouterView } from 'vue-router'
 import Modal from '@/components/ui/Modal.vue'
-import axios from '@/services/axios'
+import { useAuth } from '@/composables/useAuth'
+import { authAPI } from '@/api/auth'
 
-const auth = useAuthStore()
+// 지침에 따른 Composables 사용
+const { user, isAuthenticated, logout } = useAuth()
 const router = useRouter()
 const modalText = ref('')
 const showDeleteModal = ref(false)
@@ -64,9 +65,15 @@ function handleError(err, fallbackMsg = '회원탈퇴 실패') {
   modalText.value = err.response?.data?.detail || fallbackMsg
 }
 
-const handleLogout = () => {
-  auth.logout()
-  router.push('/')
+const handleLogout = async () => {
+  try {
+    await logout()
+    router.push('/')
+    console.log('✅ [MainView] 로그아웃 성공')
+  } catch (error) {
+    console.error('❌ [MainView] 로그아웃 실패:', error)
+    modalText.value = '로그아웃 중 오류가 발생했습니다.'
+  }
 }
 
 function openDeleteModal() {
@@ -84,14 +91,16 @@ const handleWithdraw = async () => {
     return
   }
   try {
-    await axios.delete('/auth/account/', { data: { password: deletePassword.value } })
-    auth.logout()
+    await authAPI.deleteAccount({ password: deletePassword.value })
+    await logout()
     showDeleteModal.value = false
     modalText.value = '회원탈퇴가 완료되었습니다.'
     setTimeout(() => {
       router.push('/')
     }, 1000)
+    console.log('✅ [MainView] 회원탈퇴 성공')
   } catch (err) {
+    console.error('❌ [MainView] 회원탈퇴 실패:', err)
     handleError(err)
   }
 }
