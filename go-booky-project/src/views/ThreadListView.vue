@@ -54,19 +54,26 @@
             <button
               @click.stop="toggleLike(thread)"
               class="like-btn"
-              :class="{ liked: thread.liked, animate: isAnimating(thread.id) }"
-              :aria-label="thread.liked ? '좋아요 취소' : '좋아요'"
-              :aria-pressed="thread.liked"
+              :class="{ liked: getThreadLikeStatus(thread), animate: isAnimating(thread.id) }"
+              :aria-label="getThreadLikeStatus(thread) ? '좋아요 취소' : '좋아요'"
+              :aria-pressed="getThreadLikeStatus(thread)"
               type="button"
+              :data-thread-id="thread.id"
             >
               <Transition name="heart" mode="out-in">
-                <span v-if="thread.liked" key="filled" class="heart-icon filled" aria-hidden="true"
+                <span
+                  v-if="getThreadLikeStatus(thread)"
+                  key="filled"
+                  class="heart-icon filled"
+                  aria-hidden="true"
                   >❤️</span
                 >
                 <span v-else key="empty" class="heart-icon empty" aria-hidden="true">🤍</span>
               </Transition>
               <Transition name="count" mode="out-in">
-                <span :key="thread.likes_count" class="like-count">{{ thread.likes_count }}</span>
+                <span :key="getThreadLikesCount(thread)" class="like-count">{{
+                  getThreadLikesCount(thread)
+                }}</span>
               </Transition>
             </button>
           </div>
@@ -101,12 +108,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onActivated, computed, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { categoriesData } from '@/stores/categoriesData.js'
 import { useThreads } from '@/composables/useThreads'
 import { useToast } from '@/composables/useToast'
 import { useAnimation } from '@/composables/useAnimation'
+import { useThreadStore } from '@/stores/thread'
 
 // 지침에 따른 Composables 사용
 const {
@@ -120,6 +128,9 @@ const {
 const { error: showErrorToast } = useToast()
 const { startAnimation, isAnimating } = useAnimation()
 const router = useRouter()
+
+// ThreadStore 직접 접근 (반응성 보장)
+const threadStore = useThreadStore()
 
 // 상태 관리
 const categories = categoriesData
@@ -137,6 +148,32 @@ const hasMore = computed(() => pagination.value.hasNext)
 onMounted(async () => {
   await loadInitialThreads()
   setupInfiniteScroll()
+})
+
+// 🔧 뒤로가기 시 최신 데이터 동기화를 위한 onActivated 추가
+onActivated(async () => {
+  console.log('🔄 [ThreadListView] 페이지 재활성화 - 데이터 새로고침')
+
+  // 현재 스토어에 데이터가 있는지 확인
+  if (threads.value.length > 0) {
+    // 첫 페이지만 새로고침하여 최신 상태 동기화 (기존 데이터 완전 교체)
+    try {
+      console.log('📡 [ThreadListView] 뒤로가기 감지 - 최신 데이터로 동기화 시작')
+
+      // 즉시 UI 강제 업데이트를 위해 nextTick 사용
+      await nextTick()
+      await fetchThreads({ page: 1 }) // append=false로 기존 데이터 교체
+
+      console.log('✅ [ThreadListView] 뒤로가기 후 데이터 동기화 완료:', {
+        totalThreads: threads.value.length,
+        firstThreadLiked: threads.value[0]?.liked,
+        firstThreadLikesCount: threads.value[0]?.likes_count,
+      })
+    } catch (err) {
+      console.error('❌ [ThreadListView] 데이터 새로고침 실패:', err)
+      // 에러가 발생해도 사용자에게는 알리지 않음 (백그라운드 동기화)
+    }
+  }
 })
 
 onUnmounted(() => {
@@ -241,23 +278,48 @@ const selectCategory = (categoryName) => {
 }
 
 const filteredThreads = computed(() => {
-  if (!selectedCategory.value) return threads.value
-  return threads.value.filter((thread) => thread.book.category_name === selectedCategory.value)
+  // 강제 반응성을 위해 threads.value를 명시적으로 참조
+  const currentThreads = threads.value
+  if (!selectedCategory.value) return currentThreads
+  return currentThreads.filter((thread) => thread.book.category_name === selectedCategory.value)
 })
 
 const goToThreadDetail = (threadId) => {
   router.push({ name: 'thread-detail', params: { id: threadId } })
 }
 
+// 쓰레드 좋아요 상태를 스토어에서 직접 가져오는 함수 (반응성 보장)
+const getThreadLikeStatus = (thread) => {
+  const storeThread = threadStore.getThreadById(thread.id)
+  return storeThread?.liked ?? thread.liked ?? false
+}
+
+// 쓰레드 좋아요 수를 스토어에서 직접 가져오는 함수 (반응성 보장)
+const getThreadLikesCount = (thread) => {
+  const storeThread = threadStore.getThreadById(thread.id)
+  return storeThread?.likes_count ?? thread.likes_count ?? 0
+}
+
 const toggleLike = async (thread) => {
   try {
+    // 현재 상태 로깅
+    console.log('🎯 [ThreadListView] 좋아요 토글 시작:', {
+      threadId: thread.id,
+      currentLiked: thread.liked,
+      currentCount: thread.likes_count,
+    })
+
     // 애니메이션 시작
     startAnimation(thread.id)
 
     // Pinia store를 통한 좋아요 토글 (Optimistic UI 포함)
     await toggleThreadLike(thread.id)
 
-    console.log('✅ [ThreadListView] 좋아요 토글 성공:', thread.id)
+    console.log('✅ [ThreadListView] 좋아요 토글 성공:', {
+      threadId: thread.id,
+      newLiked: thread.liked,
+      newCount: thread.likes_count,
+    })
   } catch (error) {
     console.error('❌ [ThreadListView] 좋아요 토글 실패:', error)
     showErrorToast(error.message || '로그인 후 이용 가능합니다.')

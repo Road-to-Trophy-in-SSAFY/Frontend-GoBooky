@@ -30,12 +30,13 @@ export const useThreadStore = defineStore(
     // === Getters ===
     const threads = computed(() => Array.from(threadsMap.value.values()))
 
-    const getThreadById = computed(() => {
-      return (id) => {
-        const numericId = parseInt(id)
-        return threadsMap.value.get(numericId) || null
-      }
-    })
+    const hasThreads = computed(() => threadsMap.value.size > 0)
+
+    // 함수로 직접 구현 (computed 대신)
+    const getThreadById = (id) => {
+      const numericId = parseInt(id)
+      return threadsMap.value.get(numericId) || null
+    }
 
     const filteredThreads = computed(() => {
       let result = threads.value
@@ -75,11 +76,20 @@ export const useThreadStore = defineStore(
         })
       } else {
         // 새로운 데이터로 교체
+        const oldCount = threadsMap.value.size
         const newThreadsMap = new Map()
         threadList.forEach((thread) => {
           newThreadsMap.set(thread.id, thread)
         })
         threadsMap.value = newThreadsMap
+
+        console.log('🔄 [ThreadStore] 쓰레드 목록 완전 교체:', {
+          oldCount,
+          newCount: threadList.length,
+          firstThreadId: threadList[0]?.id,
+          firstThreadLiked: threadList[0]?.liked,
+          firstThreadLikesCount: threadList[0]?.likes_count,
+        })
       }
       console.log(
         '✅ [ThreadStore] 쓰레드 목록 설정:',
@@ -187,14 +197,29 @@ export const useThreadStore = defineStore(
     function updateThreadLike(threadId, liked, likesCount) {
       const numericThreadId = parseInt(threadId)
 
-      // 목록 업데이트
+      if (!numericThreadId || isNaN(numericThreadId)) {
+        console.error('❌ [ThreadStore] 유효하지 않은 쓰레드 ID:', threadId)
+        return
+      }
+
+      let updatedInList = false
+      let updatedInDetail = false
+
+      // 목록 업데이트 - Map을 완전히 새로 생성하여 반응성 보장
       if (threadsMap.value.has(numericThreadId)) {
-        const thread = threadsMap.value.get(numericThreadId)
-        threadsMap.value.set(numericThreadId, {
-          ...thread,
+        const currentThread = threadsMap.value.get(numericThreadId)
+        const updatedThread = {
+          ...currentThread,
           liked,
           likes_count: likesCount,
-        })
+        }
+
+        // 새로운 Map 생성하여 반응성 트리거
+        const newMap = new Map(threadsMap.value)
+        newMap.set(numericThreadId, updatedThread)
+        threadsMap.value = newMap
+
+        updatedInList = true
       }
 
       // 상세 페이지 업데이트
@@ -204,14 +229,16 @@ export const useThreadStore = defineStore(
           liked,
           likes_count: likesCount,
         }
+        updatedInDetail = true
       }
 
-      console.log('✅ [ThreadStore] 좋아요 상태 동기화:', {
+      console.log('✅ [ThreadStore] 좋아요 상태 동기화 (강제 반응성):', {
         threadId: numericThreadId,
         liked,
         likesCount,
-        inList: threadsMap.value.has(numericThreadId),
-        inDetail: threadDetail.value?.id === numericThreadId,
+        updatedInList,
+        updatedInDetail,
+        totalThreadsInList: threadsMap.value.size,
       })
     }
 
@@ -245,6 +272,7 @@ export const useThreadStore = defineStore(
       filters,
 
       // Getters
+      hasThreads,
       getThreadById,
       filteredThreads,
 

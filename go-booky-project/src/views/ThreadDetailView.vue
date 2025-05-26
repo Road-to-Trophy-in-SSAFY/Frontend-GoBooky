@@ -154,6 +154,7 @@ import { useValidation, combinedSchemas } from '@/composables/useValidation'
 import { useToast } from '@/composables/useToast'
 import { useAnimation } from '@/composables/useAnimation'
 import { useAuthStore } from '@/stores/auth'
+import { useThreadStore } from '@/stores/thread'
 
 const route = useRoute()
 const router = useRouter()
@@ -172,12 +173,24 @@ const { validate, clearErrors } = useValidation(combinedSchemas.threadUpdate)
 const { error: showErrorToast } = useToast()
 const { startAnimation, isAnimating } = useAnimation()
 const authStore = useAuthStore()
+const threadStore = useThreadStore()
 
 const thread = computed(() => selectedThread.value)
 const showEditModal = ref(false)
 const showDeleteModal = ref(false)
-const isLiked = computed(() => thread.value?.liked || false)
-const likesCount = computed(() => thread.value?.likes_count || 0)
+
+// 🔧 좋아요 상태를 스토어에서 직접 가져와서 동기화 보장
+const isLiked = computed(() => {
+  if (!thread.value?.id) return false
+  const storeThread = threadStore.getThreadById(thread.value.id)
+  return storeThread?.liked || thread.value?.liked || false
+})
+
+const likesCount = computed(() => {
+  if (!thread.value?.id) return 0
+  const storeThread = threadStore.getThreadById(thread.value.id)
+  return storeThread?.likes_count || thread.value?.likes_count || 0
+})
 
 // 페이지 전환 상태 관리
 const isTransitioning = ref(false)
@@ -530,11 +543,22 @@ const handleLikeThread = async () => {
       return
     }
 
+    // 현재 상태 로깅
+    console.log('🎯 [ThreadDetailView] 좋아요 토글 시작:', {
+      threadId,
+      currentLiked: isLiked.value,
+      currentCount: likesCount.value,
+    })
+
     // 애니메이션 시작 (지침 준수: "비즈니스 로직은 훅으로")
     startAnimation(threadId)
 
     await toggleLike(threadId)
-    console.log('✅ [ThreadDetailView] 좋아요 토글 성공')
+    console.log('✅ [ThreadDetailView] 좋아요 토글 성공:', {
+      threadId,
+      newLiked: isLiked.value,
+      newCount: likesCount.value,
+    })
   } catch (error) {
     console.error('❌ [ThreadDetailView] 좋아요 처리 실패:', error)
 

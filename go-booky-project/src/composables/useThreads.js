@@ -43,6 +43,14 @@ export function useThreads() {
       if (response.results) {
         // 페이지네이션이 있는 경우
         threadStore.setThreads(response.results, append)
+
+        console.log('📊 [useThreads] 쓰레드 데이터 저장:', {
+          page: params.page || 1,
+          isFirstPage,
+          append,
+          resultCount: response.results.length,
+          totalInStore: threadStore.threads.length,
+        })
         threadStore.setPagination({
           page: params.page || 1,
           totalPages: Math.ceil(response.count / (params.page_size || 10)),
@@ -161,23 +169,35 @@ export function useThreads() {
   const toggleLike = async (threadId) => {
     const numericThreadId = parseInt(threadId)
     if (!numericThreadId || isNaN(numericThreadId)) {
-      throw new Error('유효하지 않은 쓰레드 ID입니다.')
+      const error = new Error('유효하지 않은 쓰레드 ID입니다.')
+      console.error('❌ [useThreads] 유효하지 않은 쓰레드 ID:', threadId)
+      throw error
     }
 
     // 현재 쓰레드 상태 확인
     const currentThread = threadStore.getThreadById(numericThreadId)
     if (!currentThread) {
-      throw new Error('쓰레드를 찾을 수 없습니다.')
+      const error = new Error('쓰레드를 찾을 수 없습니다.')
+      console.error('❌ [useThreads] 쓰레드를 찾을 수 없음:', numericThreadId)
+      throw error
     }
 
-    // 원본 상태 저장
-    const originalLiked = currentThread.liked
-    const originalCount = currentThread.likes_count
+    // 원본 상태 저장 (안전한 기본값 제공)
+    const originalLiked = Boolean(currentThread.liked)
+    const originalCount = Math.max(0, parseInt(currentThread.likes_count) || 0)
 
     try {
       // Optimistic UI 업데이트
       const optimisticLiked = !originalLiked
       const optimisticCount = originalCount + (optimisticLiked ? 1 : -1)
+
+      console.log('🚀 [useThreads] Optimistic UI 업데이트:', {
+        threadId: numericThreadId,
+        originalLiked,
+        optimisticLiked,
+        originalCount,
+        optimisticCount,
+      })
 
       // 즉시 UI 업데이트
       threadStore.updateThreadLike(numericThreadId, optimisticLiked, optimisticCount)
@@ -187,7 +207,14 @@ export function useThreads() {
 
       // 서버 응답 검증 및 필요시 상태 조정
       if (response.liked !== optimisticLiked || response.likes_count !== optimisticCount) {
+        console.log('🔄 [useThreads] 서버 응답과 다름 - 상태 조정:', {
+          threadId: numericThreadId,
+          optimistic: { liked: optimisticLiked, count: optimisticCount },
+          server: { liked: response.liked, count: response.likes_count },
+        })
         threadStore.updateThreadLike(numericThreadId, response.liked, response.likes_count)
+      } else {
+        console.log('✅ [useThreads] Optimistic UI 성공 - 서버 응답 일치')
       }
 
       return response
@@ -201,7 +228,16 @@ export function useThreads() {
         errorMessage = '로그인이 필요합니다.'
       } else if (err.response?.status === 403) {
         errorMessage = '권한이 없습니다.'
+      } else if (err.response?.status === 404) {
+        errorMessage = '쓰레드를 찾을 수 없습니다.'
       }
+
+      console.error('❌ [useThreads] 좋아요 토글 실패 - 롤백 완료:', {
+        threadId: numericThreadId,
+        originalLiked,
+        originalCount,
+        error: err.message,
+      })
 
       showErrorToast(errorMessage)
       throw new Error(errorMessage)

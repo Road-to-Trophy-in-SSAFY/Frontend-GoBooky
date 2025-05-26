@@ -14,7 +14,12 @@
         <!-- 메인 네비게이션 메뉴 -->
         <div class="nav-menu" :class="{ 'nav-menu-open': isMobileMenuOpen }">
           <div class="nav-links">
-            <RouterLink :to="{ name: 'home' }" class="nav-link" @click="closeMobileMenu">
+            <RouterLink
+              :to="{ path: '/' }"
+              class="nav-link"
+              @click="closeMobileMenu"
+              exact-active-class="router-link-exact-active"
+            >
               <svg
                 width="20"
                 height="20"
@@ -40,7 +45,12 @@
               <span>홈</span>
             </RouterLink>
 
-            <RouterLink :to="{ name: 'books' }" class="nav-link" @click="closeMobileMenu">
+            <RouterLink
+              :to="{ name: 'books' }"
+              class="nav-link"
+              @click="closeMobileMenu"
+              exact-active-class="router-link-exact-active"
+            >
               <svg
                 width="20"
                 height="20"
@@ -66,7 +76,12 @@
               <span>도서</span>
             </RouterLink>
 
-            <RouterLink :to="{ name: 'threads' }" class="nav-link" @click="closeMobileMenu">
+            <RouterLink
+              :to="{ name: 'threads' }"
+              class="nav-link"
+              @click="closeMobileMenu"
+              exact-active-class="router-link-exact-active"
+            >
               <svg
                 width="20"
                 height="20"
@@ -562,9 +577,10 @@ const handleDeleteSuccess = () => {
 
 .logo {
   height: 40px;
-  width: 40px;
+  width: auto;
+  max-width: 120px;
   border-radius: 8px;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .brand-text {
@@ -605,13 +621,13 @@ const handleDeleteSuccess = () => {
   background: #f1f5f9;
 }
 
-.nav-link.router-link-active {
+.nav-link.router-link-exact-active {
   color: #3b82f6;
   background: #eff6ff;
   font-weight: 600;
 }
 
-.nav-link.router-link-active::after {
+.nav-link.router-link-exact-active::after {
   content: '';
   position: absolute;
   bottom: -1px;
@@ -813,7 +829,8 @@ const handleDeleteSuccess = () => {
 
   .logo {
     height: 32px;
-    width: 32px;
+    width: auto;
+    max-width: 100px;
   }
 
   .brand-text {
