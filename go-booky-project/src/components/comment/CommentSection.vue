@@ -3,7 +3,7 @@
     <!-- 댓글 헤더 -->
     <div class="comment-header">
       <h3 class="comment-title">
-        댓글 <span class="comment-count">{{ pagination.totalCount }}</span>
+        댓글 <span class="comment-count">{{ totalCommentsCount }}</span>
       </h3>
     </div>
 
@@ -66,14 +66,31 @@
     <div v-if="error" class="error-message">
       {{ error }}
     </div>
+
+    <!-- 삭제 확인 모달 추가 -->
+    <ConfirmModal
+      v-model="showDeleteCommentModal"
+      title="댓글 삭제"
+      message="정말 이 댓글을 삭제하시겠습니까?"
+      confirm-text="삭제"
+      @confirm="confirmDeleteComment"
+    />
+    <ConfirmModal
+      v-model="showDeleteReplyModal"
+      title="답글 삭제"
+      message="정말 이 답글을 삭제하시겠습니까?"
+      confirm-text="삭제"
+      @confirm="confirmDeleteReply"
+    />
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useComments } from '@/composables/useComments'
 import CommentForm from '@/components/comment/CommentForm.vue'
 import CommentList from '@/components/comment/CommentList.vue'
+import ConfirmModal from '@/components/ConfirmModal.vue'
 
 const props = defineProps({
   threadId: {
@@ -105,6 +122,21 @@ const {
   loadMoreComments,
 } = useComments(props.threadId)
 
+// 삭제 모달 상태 관리
+const showDeleteCommentModal = ref(false)
+const showDeleteReplyModal = ref(false)
+const pendingDeleteCommentId = ref(null)
+const pendingDeleteReplyData = ref({ commentId: null, replyId: null })
+
+// 전체 댓글 수 계산 (댓글 + 대댓글)
+const totalCommentsCount = computed(() => {
+  return comments.value.reduce((total, comment) => {
+    // 각 댓글에 대해 대댓글 수를 더함
+    const replyCount = comment.replies?.length || 0
+    return total + 1 + replyCount // 댓글 1개 + 대댓글 수
+  }, 0)
+})
+
 // 댓글 작성
 const handleCommentSubmit = async (content) => {
   try {
@@ -124,14 +156,19 @@ const handleUpdateComment = async (commentId, content) => {
 }
 
 // 댓글 삭제
-const handleDeleteComment = async (commentId) => {
-  if (confirm('정말 댓글을 삭제하시겠습니까?')) {
-    try {
-      await deleteComment(commentId)
-    } catch (error) {
-      console.error('댓글 삭제 실패:', error)
-    }
+const handleDeleteComment = (commentId) => {
+  pendingDeleteCommentId.value = commentId
+  showDeleteCommentModal.value = true
+}
+
+// 댓글 삭제 확인
+const confirmDeleteComment = async () => {
+  try {
+    await deleteComment(pendingDeleteCommentId.value)
+  } catch (error) {
+    console.error('댓글 삭제 실패:', error)
   }
+  pendingDeleteCommentId.value = null
 }
 
 // 대댓글 작성
@@ -153,14 +190,20 @@ const handleUpdateReply = async (commentId, replyId, content) => {
 }
 
 // 대댓글 삭제
-const handleDeleteReply = async (commentId, replyId) => {
-  if (confirm('정말 답글을 삭제하시겠습니까?')) {
-    try {
-      await deleteReply(commentId, replyId)
-    } catch (error) {
-      console.error('답글 삭제 실패:', error)
-    }
+const handleDeleteReply = (commentId, replyId) => {
+  pendingDeleteReplyData.value = { commentId, replyId }
+  showDeleteReplyModal.value = true
+}
+
+// 대댓글 삭제 확인
+const confirmDeleteReply = async () => {
+  try {
+    const { commentId, replyId } = pendingDeleteReplyData.value
+    await deleteReply(commentId, replyId)
+  } catch (error) {
+    console.error('답글 삭제 실패:', error)
   }
+  pendingDeleteReplyData.value = { commentId: null, replyId: null }
 }
 
 // 컴포넌트 마운트 시 댓글 로드

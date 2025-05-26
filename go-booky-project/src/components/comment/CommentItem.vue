@@ -18,7 +18,7 @@
         >
           편집
         </button>
-        <button @click="handleDelete" class="action-btn delete-btn" :disabled="isSubmitting">
+        <button @click="$emit('delete')" class="action-btn delete-btn" :disabled="isSubmitting">
           삭제
         </button>
       </div>
@@ -173,13 +173,6 @@ const saveEdit = () => {
 const cancelEdit = () => {
   editContent.value = props.comment.content
   emit('edit')
-}
-
-// 삭제 확인
-const handleDelete = () => {
-  if (confirm('정말 댓글을 삭제하시겠습니까?')) {
-    emit('delete')
-  }
 }
 
 // 답글 작성

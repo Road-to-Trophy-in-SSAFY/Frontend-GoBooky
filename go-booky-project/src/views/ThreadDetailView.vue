@@ -64,6 +64,8 @@
             theme="snow"
             toolbar="essential"
             :options="editorOptions"
+            :enable="true"
+            :read-only="false"
             class="editor-container"
           />
         </div>
@@ -183,6 +185,9 @@ const editorOptions = {
     ],
   },
   placeholder: '내용을 입력하세요',
+  // DOMNodeInserted 이벤트 사용 방지
+  bounds: document.body,
+  scrollingContainer: null,
 }
 
 const loadThread = async () => {
