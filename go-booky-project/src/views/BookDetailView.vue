@@ -2,22 +2,39 @@
   <div class="book-detail-container">
     <div class="book-header">
       <!-- 쓰레드 작성 버튼 -->
-      <button v-if="book" @click="handleThreadWriteClick" class="thread-write-btn">
+      <button
+        v-if="book && !isBookLoading"
+        @click="handleThreadWriteClick"
+        class="thread-write-btn"
+      >
         쓰레드 작성
       </button>
     </div>
-    <div v-if="book" class="book-content">
-      <p>{{ book.title }}</p>
-      <p>{{ book.author }}</p>
-      <p>{{ book.publisher }}</p>
-      <p>{{ book.pub_date }}</p>
-      <img :src="book.cover" alt="Book Cover" />
-      <p>{{ book.description }}</p>
-      <p>ISBN: {{ book.isbn }}</p>
-    </div>
-    <div v-else>
+
+    <!-- 로딩 인디케이터 -->
+    <div v-if="isBookLoading" class="book-loading">
+      <div class="loading-spinner"></div>
       <p>책 정보를 불러오는 중입니다...</p>
     </div>
+
+    <!-- 페이드 인/아웃 애니메이션 적용 -->
+    <transition name="fade" mode="out-in">
+      <div v-if="book && !isBookLoading" class="book-content" :key="book.id">
+        <p>{{ book.title }}</p>
+        <p>{{ book.author }}</p>
+        <p>{{ book.publisher }}</p>
+        <p>{{ book.pub_date }}</p>
+        <img :src="book.cover" alt="Book Cover" />
+        <p>{{ book.description }}</p>
+        <p>ISBN: {{ book.isbn }}</p>
+
+        <!-- 연관 도서 컴포넌트 추가 -->
+        <RelatedBooks :related-books="book.related_books" />
+      </div>
+      <div v-else-if="!isBookLoading && !book" class="book-error">
+        <p>책 정보를 불러올 수 없습니다.</p>
+      </div>
+    </transition>
 
     <!-- 쓰레드 작성 모달 -->
     <Modal
@@ -88,12 +105,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useBooks } from '@/composables/useBooks'
 import { useThreads } from '@/composables/useThreads'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute, useRouter } from 'vue-router'
 import Modal from '@/components/Modal.vue'
+import RelatedBooks from '@/components/RelatedBooks.vue'
 import { QuillEditor } from '@vueup/vue-quill'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
@@ -105,6 +123,7 @@ const router = useRouter()
 const book = computed(() => selectedBook.value)
 const showWriteModal = ref(false)
 const isLoading = ref(false)
+const isBookLoading = ref(false)
 const today = new Date().toISOString().split('T')[0]
 
 const threadForm = ref({
@@ -135,9 +154,29 @@ const editorOptions = {
   placeholder: '내용을 입력하세요',
 }
 
+// 책 정보를 불러오는 함수
+const loadBookData = async (bookId) => {
+  try {
+    isBookLoading.value = true // 로딩 시작
+    await fetchBook(bookId)
+    if (book.value) {
+      threadForm.value.book = book.value.id
+    }
+  } catch (error) {
+    console.error('책 정보 로드 실패:', error)
+  } finally {
+    // 로딩 완료 후 약간의 지연을 두어 부드러운 전환 효과
+    setTimeout(() => {
+      isBookLoading.value = false // 로딩 완료
+      // 스크롤을 최상단으로 이동
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }, 300)
+  }
+}
+
 // 쓰레드 작성 버튼 클릭 핸들러
 const handleThreadWriteClick = () => {
-  console.log('🔍 [BookDetailView] 인증 상태 확인:', {
+  console.log('📝 [BookDetailView] 인증 상태 확인:', {
     isAuthenticated: authStore.isAuthenticated,
     hasToken: !!authStore.accessToken,
     user: authStore.user?.email,
@@ -152,15 +191,19 @@ const handleThreadWriteClick = () => {
   showWriteModal.value = true
 }
 
-onMounted(async () => {
-  try {
-    await fetchBook(route.params.id)
-    if (book.value) {
-      threadForm.value.book = book.value.id
+// 라우트 파라미터가 변경될 때마다 책 정보를 다시 불러옴
+watch(
+  () => route.params.id,
+  (newId) => {
+    if (newId) {
+      loadBookData(newId)
+      // 스크롤 이동은 loadBookData 내에서 처리
     }
-  } catch (error) {
-    console.error('책 정보 로드 실패:', error)
-  }
+  },
+)
+
+onMounted(() => {
+  loadBookData(route.params.id)
 })
 
 const submitThread = async () => {
@@ -218,6 +261,7 @@ const submitThread = async () => {
 <style scoped>
 .book-detail-container {
   padding: 20px;
+  min-height: 80vh; /* 최소 높이 설정 */
 }
 
 .book-header {
@@ -237,6 +281,52 @@ const submitThread = async () => {
 
 .book-content {
   margin-top: 20px;
+}
+
+/* 페이드 애니메이션 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 로딩 인디케이터 스타일 */
+.book-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  min-height: 300px;
+}
+
+.book-loading .loading-spinner {
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #4caf50;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 2s linear infinite;
+  margin-bottom: 20px;
+}
+
+.book-error {
+  text-align: center;
+  padding: 40px;
+  color: #d32f2f;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* 쓰레드 작성 폼 스타일 */
@@ -331,15 +421,6 @@ const submitThread = async () => {
   height: 30px;
   animation: spin 2s linear infinite;
   margin: 15px auto 0;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
 }
 
 @keyframes pulse {
