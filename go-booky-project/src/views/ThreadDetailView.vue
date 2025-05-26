@@ -5,21 +5,39 @@
 
     <!-- 쓰레드 이미지 표시 -->
     <div class="thread-image">
-      <!-- 이미지 로딩 중 -->
-      <div v-if="imageState.loading" class="image-placeholder">
+      <!-- AI 이미지 생성 중 -->
+      <div v-if="imageState.isGenerating" class="image-placeholder generating">
+        <div class="loading-spinner ai-generating"></div>
+        <div class="generation-info">
+          <p class="generation-title">🎨 AI 이미지 생성 중...</p>
+          <p class="generation-subtitle">독서 기록을 바탕으로 맞춤 이미지를 만들고 있어요</p>
+          <div class="progress-indicator">
+            <div class="progress-dots">
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+            </div>
+            <p class="progress-text">확인 중</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 일반 이미지 로딩 중 -->
+      <div v-else-if="imageState.loading && !imageState.showActualImage" class="image-placeholder">
         <div class="loading-spinner"></div>
-        <p>이미지 생성 중...</p>
+        <p>이미지 로딩 중...</p>
       </div>
 
       <!-- 실제 이미지 -->
-      <img
-        v-else-if="imageState.showActualImage"
-        :src="imageState.actualImageUrl"
-        alt="쓰레드 이미지"
-        class="cover-image"
-        @load="handleImageLoad"
-        @error="handleImageError"
-      />
+      <Transition v-else-if="imageState.showActualImage" name="image-fade" appear>
+        <img
+          :src="imageState.actualImageUrl"
+          alt="쓰레드 이미지"
+          class="cover-image"
+          @load="handleImageLoad"
+          @error="handleImageError"
+        />
+      </Transition>
 
       <!-- 대체 이미지 -->
       <div v-else class="default-image-container">
@@ -124,7 +142,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Modal from '@/components/Modal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
@@ -187,7 +205,13 @@ const imageState = ref({
   actualImageUrl: null,
   hasError: false,
   loadAttempted: false,
+  isGenerating: false, // AI 이미지 생성 중 상태
 })
+
+// 이미지 생성 폴링 관련
+const imagePollingInterval = ref(null)
+const maxPollingAttempts = 30 // 최대 30번 시도 (약 1분)
+const pollingAttempts = ref(0)
 
 // API URL
 const API_URL = 'http://127.0.0.1:8000'
@@ -196,6 +220,9 @@ const API_URL = 'http://127.0.0.1:8000'
 const initializeImageState = () => {
   if (!thread.value) return
 
+  // 기존 폴링 정리
+  clearImagePolling()
+
   // 상태 초기화
   imageState.value = {
     loading: false,
@@ -203,6 +230,7 @@ const initializeImageState = () => {
     actualImageUrl: null,
     hasError: false,
     loadAttempted: false,
+    isGenerating: false,
   }
 
   // 이미지 URL 확인
@@ -237,15 +265,81 @@ const initializeImageState = () => {
     }
     img.src = imageUrl
   } else {
-    // 이미지가 없는 경우 바로 대체 이미지 표시
-    imageState.value.loading = false
-    imageState.value.loadAttempted = true
+    // 이미지가 없는 경우 - 새로 생성된 쓰레드인지 확인
+    const threadCreatedTime = new Date(thread.value.created_at).getTime()
+    const currentTime = new Date().getTime()
+    const timeDiff = currentTime - threadCreatedTime
+
+    // 5분 이내에 생성된 쓰레드라면 이미지 생성 중으로 간주
+    if (timeDiff < 5 * 60 * 1000) {
+      console.log('🎨 [ThreadDetailView] 최근 생성된 쓰레드 - 이미지 생성 폴링 시작')
+      startImageGenerationPolling()
+    } else {
+      // 오래된 쓰레드는 바로 대체 이미지 표시
+      imageState.value.loading = false
+      imageState.value.loadAttempted = true
+    }
   }
+}
+
+// 이미지 생성 폴링 시작
+const startImageGenerationPolling = () => {
+  imageState.value.isGenerating = true
+  imageState.value.loading = true
+  pollingAttempts.value = 0
+
+  console.log('🔄 [ThreadDetailView] 이미지 생성 폴링 시작')
+
+  imagePollingInterval.value = setInterval(async () => {
+    pollingAttempts.value++
+
+    try {
+      // 쓰레드 정보 다시 조회
+      await fetchThread(parseInt(route.params.id))
+
+      // 이미지가 생성되었는지 확인
+      if (thread.value && (thread.value.cover_img || thread.value.cover_img_url)) {
+        console.log('✅ [ThreadDetailView] 이미지 생성 완료 감지')
+        clearImagePolling()
+
+        // 부드러운 전환을 위해 약간의 지연 후 이미지 로딩 시작
+        setTimeout(() => {
+          initializeImageState()
+          // 이미지 생성 완료 알림 (선택적)
+          console.log('🎨 [ThreadDetailView] AI 이미지 생성이 완료되었습니다!')
+        }, 300)
+        return
+      }
+
+      // 최대 시도 횟수 도달 시 폴링 중단
+      if (pollingAttempts.value >= maxPollingAttempts) {
+        console.log('⏰ [ThreadDetailView] 이미지 생성 폴링 타임아웃')
+        clearImagePolling()
+        imageState.value.isGenerating = false
+        imageState.value.loading = false
+        imageState.value.loadAttempted = true
+      }
+    } catch (error) {
+      console.error('❌ [ThreadDetailView] 이미지 폴링 중 오류:', error)
+    }
+  }, 2000) // 2초마다 확인
+}
+
+// 이미지 폴링 정리
+const clearImagePolling = () => {
+  if (imagePollingInterval.value) {
+    clearInterval(imagePollingInterval.value)
+    imagePollingInterval.value = null
+  }
+  imageState.value.isGenerating = false
+  pollingAttempts.value = 0
 }
 
 // 이미지 로드 성공 핸들러
 const handleImageLoad = () => {
   console.log('✅ [ThreadDetailView] 이미지 로드 성공')
+  // 이미지 로딩 상태를 false로 설정하여 부드러운 전환 효과 적용
+  imageState.value.loading = false
 }
 
 // 이미지 로드 실패 핸들러
@@ -471,6 +565,13 @@ onMounted(async () => {
     isTransitioning.value = false
   }
 })
+
+// 컴포넌트 언마운트 시 정리
+onUnmounted(() => {
+  console.log('🧹 [ThreadDetailView] 컴포넌트 언마운트 - 리소스 정리')
+  clearImagePolling()
+  clearThreadDetail()
+})
 </script>
 
 <style scoped>
@@ -502,6 +603,12 @@ onMounted(async () => {
   max-height: 400px;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.cover-image:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
 }
 
 .image-placeholder {
@@ -513,6 +620,113 @@ onMounted(async () => {
   background-color: #f8f9fa;
   border-radius: 8px;
   border: 2px dashed #dee2e6;
+}
+
+/* AI 이미지 생성 중 스타일 */
+.image-placeholder.generating {
+  min-height: 300px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: 2px solid #667eea;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.image-placeholder.generating::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
+}
+
+.generation-info {
+  text-align: center;
+  z-index: 1;
+  position: relative;
+}
+
+.generation-title {
+  font-size: 1.2em;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.generation-subtitle {
+  font-size: 0.9em;
+  opacity: 0.9;
+  margin: 0 0 20px 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.progress-indicator {
+  margin-top: 16px;
+}
+
+.progress-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.progress-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.7);
+  animation: dotPulse 1.5s infinite ease-in-out;
+}
+
+.progress-dots .dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.progress-dots .dot:nth-child(2) {
+  animation-delay: 0.3s;
+}
+
+.progress-dots .dot:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes dotPulse {
+  0%,
+  60%,
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  30% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+}
+
+.progress-text {
+  font-size: 0.8em;
+  opacity: 0.8;
+  margin: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.ai-generating {
+  border-color: rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  animation: spin 1.5s linear infinite;
 }
 
 .loading-spinner {
@@ -532,6 +746,23 @@ onMounted(async () => {
   100% {
     transform: rotate(360deg);
   }
+}
+
+/* 이미지 페이드인 애니메이션 */
+.image-fade-enter-active {
+  transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.image-fade-enter-from {
+  opacity: 0;
+  transform: scale(0.95) translateY(20px);
+  filter: blur(4px);
+}
+
+.image-fade-enter-to {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  filter: blur(0px);
 }
 
 /* 대체 이미지 컨테이너 스타일 */
