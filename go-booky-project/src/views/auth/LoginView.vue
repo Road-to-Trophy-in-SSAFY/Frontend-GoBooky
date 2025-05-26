@@ -68,7 +68,7 @@ import SanitizedInput from '@/components/common/SanitizedInput.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { useValidation, combinedSchemas } from '@/composables/useValidation'
 
-const { login, error: authError } = useAuth()
+const { login } = useAuth()
 const router = useRouter()
 const email = ref('')
 const password = ref('')

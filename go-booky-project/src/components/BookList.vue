@@ -7,9 +7,10 @@
 <script setup>
 import BookCard from '@/components/BookCard.vue'
 
-const props = defineProps({
+defineProps({
   books: {
     type: Array,
+    default: () => [],
   },
 })
 </script>

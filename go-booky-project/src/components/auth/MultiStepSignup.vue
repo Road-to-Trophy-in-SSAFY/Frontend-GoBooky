@@ -304,8 +304,8 @@ const stepConfigs = stepLabels.map((label, index) => ({
 
 const { currentStep, isLastStep, nextStep } = useMultiStepForm(stepConfigs)
 
-// 지침에 따른 검증 시스템 - 기본 스키마로 초기화
-const { validate, clearErrors } = useValidation(combinedSchemas.signup)
+// 지침에 따른 검증 시스템 - clearErrors만 사용
+const { clearErrors } = useValidation(combinedSchemas.signup)
 
 // 폼 상태를 하나의 객체로 통합
 const formState = ref({
@@ -373,21 +373,7 @@ const canProceed = computed(() => {
   }
 })
 
-// 지침에 따른 단계별 검증 스키마 매핑
-const getSchemaForStep = (step) => {
-  switch (step) {
-    case 0:
-      return combinedSchemas.signupStep1
-    case 1:
-      return null // 이메일 인증은 별도 처리
-    case 2:
-      return combinedSchemas.signupStep2
-    case 3:
-      return combinedSchemas.signupStep3
-    default:
-      return null
-  }
-}
+// 지침에 따른 단계별 검증 스키마는 각 함수에서 직접 사용
 
 // 에러 처리 유틸리티 함수
 const handleError = (err) => {
@@ -460,9 +446,7 @@ const checkEmailVerified = async () => {
   }
   try {
     formState.value.loading.check = true
-    const res = await authAPI.verifyEmail({
-      uuid: formState.value.verification.uuid,
-    })
+    const res = await authAPI.verifyEmail(formState.value.verification.uuid)
     if (res.detail?.includes('완료')) {
       formState.value.verification.verified = true
       formState.value.modal.text = '이메일 인증이 완료되었습니다! 다음 단계로 진행할 수 있습니다.'

@@ -21,7 +21,11 @@
 </template>
 
 <script setup>
-import { watch } from 'vue'
+import { watch, defineOptions } from 'vue'
+
+defineOptions({
+  name: 'BaseModal',
+})
 
 const props = defineProps({
   modelValue: {

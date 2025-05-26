@@ -54,12 +54,22 @@ export const authAPI = {
   },
 
   /**
-   * 이메일 인증
+   * 이메일 인증 (POST - 인증 상태 확인)
    * @param {string} uuid 인증 UUID
    * @returns {Promise} 인증 응답
    */
   async verifyEmail(uuid) {
-    const response = await api.post(`/auth/auth/verify-email/${uuid}/`)
+    const response = await api.post(`/auth/auth/register/verify/`, { uuid })
+    return response.data
+  },
+
+  /**
+   * 이메일 인증 링크 처리 (GET - 실제 인증 처리)
+   * @param {string} uuid 인증 UUID
+   * @returns {Promise} 인증 응답
+   */
+  async verifyEmailByUUID(uuid) {
+    const response = await api.get(`/auth/auth/verify-email/${uuid}/`)
     return response.data
   },
 
@@ -82,6 +92,16 @@ export const authAPI = {
    */
   async completeProfile(profileData) {
     const response = await api.post('/auth/auth/register/complete/', profileData)
+    return response.data
+  },
+
+  /**
+   * 회원가입 완료
+   * @param {Object} registrationData 회원가입 완료 데이터
+   * @returns {Promise} 회원가입 완료 응답
+   */
+  async completeRegistration(registrationData) {
+    const response = await api.patch('/auth/auth/register/complete/', registrationData)
     return response.data
   },
 
@@ -120,11 +140,11 @@ export const authAPI = {
 
   /**
    * 닉네임 중복 확인
-   * @param {string} nickname 닉네임
+   * @param {Object} data 닉네임 데이터
    * @returns {Promise} 중복 확인 결과
    */
-  async checkNickname(nickname) {
-    const response = await api.post('/auth/auth/check-nickname/', { nickname })
+  async checkNickname(data) {
+    const response = await api.post('/auth/auth/check-nickname/', data)
     return response.data
   },
 
