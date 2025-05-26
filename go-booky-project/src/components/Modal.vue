@@ -21,7 +21,7 @@
 </template>
 
 <script setup>
-import { watch, defineOptions } from 'vue'
+import { watch } from 'vue'
 
 defineOptions({
   name: 'BaseModal',
