@@ -110,6 +110,15 @@ export const useThreadStore = defineStore(
     }
 
     /**
+     * 쓰레드 상세 데이터 클리어 (페이지 전환 시 깜빡임 방지)
+     */
+    function clearThreadDetail() {
+      const previousId = threadDetail.value?.id
+      threadDetail.value = null
+      console.log('🧹 [ThreadStore] 쓰레드 상세 데이터 클리어 (이전 ID:', previousId, ')')
+    }
+
+    /**
      * 페이지네이션 정보 설정
      * @param {Object} paginationData 페이지네이션 데이터
      */
@@ -242,6 +251,7 @@ export const useThreadStore = defineStore(
       // Actions
       setThreads,
       setThreadDetail,
+      clearThreadDetail,
       setPagination,
       setFilters,
       addThread,

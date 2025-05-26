@@ -1,6 +1,6 @@
 <!-- 쓰레드 상세 보기 -->
 <template>
-  <div v-if="thread" class="thread-detail">
+  <div v-if="thread && thread.id === currentThreadId && !isTransitioning" class="thread-detail">
     <h2>{{ thread.title }}</h2>
 
     <!-- 쓰레드 이미지 표시 -->
@@ -109,8 +109,17 @@
     <!-- 댓글 섹션 -->
     <CommentSection :thread-id="parseInt(route.params.id)" />
   </div>
-  <div v-else>
-    <p>쓰레드를 불러오는 중입니다...</p>
+  <div v-else class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>
+      {{
+        isTransitioning
+          ? '새로운 쓰레드를 불러오는 중...'
+          : isLoading
+            ? '쓰레드를 불러오는 중입니다...'
+            : '쓰레드 정보를 준비하고 있습니다...'
+      }}
+    </p>
   </div>
 </template>
 
@@ -135,6 +144,7 @@ const router = useRouter()
 const {
   selectedThread,
   fetchThread,
+  clearThreadDetail,
   updateThread: updateThreadAPI,
   deleteThread: deleteThreadAPI,
   toggleLike,
@@ -150,6 +160,10 @@ const showEditModal = ref(false)
 const showDeleteModal = ref(false)
 const isLiked = computed(() => thread.value?.liked || false)
 const likesCount = computed(() => thread.value?.likes_count || 0)
+
+// 페이지 전환 상태 관리
+const isTransitioning = ref(false)
+const currentThreadId = ref(null)
 
 // 현재 사용자가 쓰레드 작성자인지 확인
 const isThreadOwner = computed(() => {
@@ -241,11 +255,45 @@ const handleImageError = () => {
   imageState.value.hasError = true
 }
 
+// 라우트 변경 감지 및 전환 상태 관리
+watch(
+  () => route.params.id,
+  async (newId, oldId) => {
+    const newThreadId = parseInt(newId)
+
+    // ID가 유효하지 않으면 처리하지 않음
+    if (!newThreadId || isNaN(newThreadId)) {
+      console.error('❌ [ThreadDetailView] 유효하지 않은 쓰레드 ID:', newId)
+      return
+    }
+
+    // 동일한 ID면 처리하지 않음
+    if (newThreadId === currentThreadId.value) {
+      return
+    }
+
+    console.log('🔄 [ThreadDetailView] 쓰레드 전환:', oldId, '→', newId)
+
+    // 전환 시작 - 이전 데이터 즉시 클리어
+    isTransitioning.value = true
+    clearThreadDetail()
+    currentThreadId.value = newThreadId
+
+    try {
+      await loadThread()
+    } finally {
+      // 전환 완료
+      isTransitioning.value = false
+    }
+  },
+  { immediate: false },
+)
+
 // 쓰레드 변경 시 이미지 상태 초기화
 watch(
   thread,
   (newThread) => {
-    if (newThread) {
+    if (newThread && newThread.id === currentThreadId.value) {
       initializeImageState()
     }
   },
@@ -405,12 +453,23 @@ onMounted(async () => {
   // 컴포넌트 마운트 시 ID 유효성 검사
   const threadId = parseInt(route.params.id)
   if (!threadId || isNaN(threadId)) {
-    console.error('유효하지 않은 쓰레드 ID:', route.params.id)
+    console.error('❌ [ThreadDetailView] 유효하지 않은 쓰레드 ID:', route.params.id)
     router.push({ name: 'threads' }) // 유효하지 않은 ID인 경우 목록 페이지로 리다이렉트
     return
   }
 
-  await loadThread()
+  console.log('🚀 [ThreadDetailView] 컴포넌트 마운트, 쓰레드 ID:', threadId)
+
+  // 초기 상태 설정
+  isTransitioning.value = true
+  currentThreadId.value = threadId
+  clearThreadDetail()
+
+  try {
+    await loadThread()
+  } finally {
+    isTransitioning.value = false
+  }
 })
 </script>
 
@@ -419,6 +478,18 @@ onMounted(async () => {
   padding: 20px;
   max-width: 800px;
   margin: 0 auto;
+  animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .thread-image {
@@ -702,5 +773,36 @@ onMounted(async () => {
   min-height: 200px;
   font-size: 14px;
   line-height: 1.6;
+}
+
+/* 로딩 컨테이너 스타일 */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 40px;
+  text-align: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.loading-container .loading-spinner {
+  margin-bottom: 20px;
+}
+
+.loading-container p {
+  color: #6c757d;
+  font-size: 16px;
+  margin: 0;
 }
 </style>

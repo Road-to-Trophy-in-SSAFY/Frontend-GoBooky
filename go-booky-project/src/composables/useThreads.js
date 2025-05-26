@@ -70,6 +70,13 @@ export function useThreads() {
   }
 
   /**
+   * 쓰레드 상세 데이터 클리어 (페이지 전환 시 깜빡임 방지)
+   */
+  const clearThreadDetail = () => {
+    threadStore.clearThreadDetail()
+  }
+
+  /**
    * 쓰레드 상세 조회
    * @param {number} threadId 쓰레드 ID
    * @returns {Promise} 쓰레드 상세 정보
@@ -264,6 +271,7 @@ export function useThreads() {
     // 메서드
     fetchThreads,
     fetchThread,
+    clearThreadDetail,
     createThread,
     updateThread,
     deleteThread,

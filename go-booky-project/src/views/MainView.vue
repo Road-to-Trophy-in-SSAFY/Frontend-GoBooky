@@ -382,7 +382,7 @@
 
     <!-- 메인 컨텐츠 -->
     <main class="main-content">
-      <RouterView />
+      <RouterView :key="$route.fullPath" />
     </main>
 
     <!-- 모달들 -->
