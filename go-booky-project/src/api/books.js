@@ -31,6 +31,16 @@ export const booksAPI = {
     return response.data
   },
 
+  /**
+   * 책 저장/해제 토글
+   * @param {number} bookId 도서 ID
+   * @returns {Promise} 토글 결과
+   */
+  async toggleBookSave(bookId) {
+    const response = await api.post(`/auth/books/${bookId}/save/`)
+    return response.data
+  },
+
   // === 레거시 호환성 (기존 프론트엔드용) ===
 
   /**

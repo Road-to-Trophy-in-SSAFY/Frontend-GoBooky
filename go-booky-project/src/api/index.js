@@ -9,24 +9,13 @@ import axios from 'axios'
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000',
   withCredentials: true, // HttpOnly 쿠키 전송을 위해 필요
-  timeout: 60000, // 60초 타임아웃 (이미지 생성을 위해 증가)
+  timeout: 60000, // 60초 타임아웃
 })
 
-// 토큰 갱신 중인지 확인하는 플래그
-let isRefreshing = false
+// 토큰 갱신 중인지 확인하는 플래그 (지침에 따른 중복 방지)
+let refreshing = false
 // 갱신 대기 중인 요청들을 저장하는 배열
-let refreshSubscribers = []
-
-// 갱신 대기 중인 요청들을 처리하는 함수
-const onRefreshed = (accessToken) => {
-  refreshSubscribers.forEach((callback) => callback(accessToken))
-  refreshSubscribers = []
-}
-
-// 갱신 대기 중인 요청을 추가하는 함수
-const addRefreshSubscriber = (callback) => {
-  refreshSubscribers.push(callback)
-}
+let queue = []
 
 // 쿠키에서 특정 이름의 값을 가져오는 함수 (CSRF 토큰용)
 function getCookie(name) {
@@ -44,20 +33,16 @@ function getCookie(name) {
   return cookieValue
 }
 
-// 요청 인터셉터 - 지침에 따른 JWT 방식
+// 요청 인터셉터 - 지침에 따른 access token 주입
 api.interceptors.request.use(
   async (config) => {
     // 동적 import로 순환 참조 방지
     const { useAuthStore } = await import('@/stores/auth')
     const authStore = useAuthStore()
 
-    // JWT 인증 관련 엔드포인트는 특별 처리
-    const isAuthEndpoint = config.url?.includes('/auth/jwt/')
-
-    // Access token이 있고 인증 엔드포인트가 아닌 경우 Authorization 헤더 추가
-    if (authStore.accessToken && !isAuthEndpoint) {
+    // Access token이 있으면 Authorization 헤더 추가
+    if (authStore.accessToken) {
       config.headers.Authorization = `Bearer ${authStore.accessToken}`
-      console.log('🔑 [API][REQ] Authorization 헤더 추가:', config.url)
     }
 
     // POST, PUT, PATCH, DELETE 요청에 CSRF 토큰 추가
@@ -76,106 +61,79 @@ api.interceptors.request.use(
   },
 )
 
-// 응답 인터셉터 - 지침에 따른 JWT 방식
+// 응답 인터셉터 - 지침에 따른 401 처리
 api.interceptors.response.use(
   (response) => {
-    // 성공 응답은 그대로 반환
     return response
   },
   async (error) => {
     const originalRequest = error.config
 
-    // 401 에러 처리
-    if (error.response?.status === 401) {
-      const isAuthEndpoint = originalRequest.url?.includes('/auth/jwt/')
+    // 401 에러 처리 (지침에 따른 패턴)
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
 
-      // 로그아웃 요청의 401은 정상적인 경우 (이미 로그아웃된 상태)
+      // 로그아웃 요청의 401은 정상적인 경우
       if (originalRequest.url?.includes('/auth/jwt/logout/')) {
-        console.log('ℹ️ [API][RES] 로그아웃 401 - 정상 처리')
         return Promise.reject(error)
       }
 
       // 토큰 갱신 요청의 401은 refresh token 만료
       if (originalRequest.url?.includes('/auth/jwt/refresh/')) {
-        console.log(
-          '🔒 [API][RES] Refresh token 만료 - 상태만 초기화 (리다이렉트는 라우터 가드에서 처리)',
-        )
-        // 동적 import로 순환 참조 방지
         const { useAuthStore } = await import('@/stores/auth')
         const authStore = useAuthStore()
-        await authStore.resetAuth()
-
-        // ⚠️ 강제 리다이렉트 제거 - 라우터 가드에서 처리하도록 함
-        // 이렇게 하면 requiresAuth가 false인 페이지는 그대로 유지됨
-
+        authStore.resetAuth()
         return Promise.reject(error)
       }
 
-      // 일반 API 요청의 401 처리 (토큰 갱신 시도)
-      if (!isAuthEndpoint && !originalRequest._retry) {
-        originalRequest._retry = true
-
-        if (isRefreshing) {
-          // 이미 갱신 중이면 대기
-          console.log('⏳ [API][RES] 토큰 갱신 대기 중...')
-          return new Promise((resolve) => {
-            addRefreshSubscriber((accessToken) => {
-              if (accessToken) {
-                originalRequest.headers.Authorization = `Bearer ${accessToken}`
-                resolve(api(originalRequest))
-              } else {
-                resolve(Promise.reject(error))
-              }
-            })
-          })
-        }
-
-        // 토큰 갱신 시도
-        isRefreshing = true
-        try {
-          console.log('🔄 [API][RES] 401 에러 - 토큰 갱신 시도')
-          // 동적 import로 순환 참조 방지
-          const { useAuthStore } = await import('@/stores/auth')
-          const authStore = useAuthStore()
-
-          const success = await authStore.refreshToken()
-
-          if (success && authStore.accessToken) {
-            // 갱신 성공 - 원래 요청 재시도
-            originalRequest.headers.Authorization = `Bearer ${authStore.accessToken}`
-            onRefreshed(authStore.accessToken)
-            console.log('✅ [API][RES] 토큰 갱신 성공 - 원래 요청 재시도')
+      // 중복 refresh 방지 (지침에 따른 패턴)
+      if (refreshing) {
+        return new Promise((resolve, reject) => {
+          queue.push({ resolve, reject })
+        })
+          .then(() => {
             return api(originalRequest)
-          } else {
-            // 갱신 실패
-            onRefreshed(null)
-            console.log('❌ [API][RES] 토큰 갱신 실패 - 인증 상태 초기화')
-          }
-        } catch (refreshError) {
-          onRefreshed(null)
-          console.error('❌ [API][RES] 토큰 갱신 중 오류:', refreshError)
-        } finally {
-          isRefreshing = false
-        }
+          })
+          .catch((err) => {
+            return Promise.reject(err)
+          })
+      }
+
+      refreshing = true
+      try {
+        const { useAuthStore } = await import('@/stores/auth')
+        const authStore = useAuthStore()
+
+        await authStore.silentRefresh()
+
+        // 대기 중인 요청들 재시도
+        queue.forEach(({ resolve }) => resolve())
+        queue = []
+
+        return api(originalRequest)
+      } catch (refreshError) {
+        // 갱신 실패 시 대기 중인 요청들 모두 실패 처리
+        queue.forEach(({ reject }) => reject(refreshError))
+        queue = []
+
+        const { useAuthStore } = await import('@/stores/auth')
+        const authStore = useAuthStore()
+        authStore.resetAuth()
+
+        return Promise.reject(error)
+      } finally {
+        refreshing = false
       }
     }
 
-    // 지침에 따른 전역 오류 처리 - Toast 시스템 활용
+    // 전역 오류 처리 - 특정 엔드포인트는 Toast 표시 제외
     if (error.response) {
-      console.error('🚨 [API][RES] 서버 에러:', {
-        status: error.response.status,
-        url: originalRequest.url,
-        data: error.response.data,
-      })
-
-      // 특정 엔드포인트는 Toast 표시 제외 (컴포넌트에서 직접 처리)
       const skipToastUrls = [
         '/auth/jwt/login/',
         '/auth/jwt/refresh/',
         '/auth/jwt/logout/',
         '/auth/auth/signup/',
         '/auth/auth/verify-email/',
-        '/auth/auth/profile/', // 프로필 관련 API는 미구현 상태이므로 토스트 제외
       ]
 
       const shouldShowToast = !skipToastUrls.some((url) => originalRequest.url?.includes(url))
@@ -195,8 +153,6 @@ api.interceptors.response.use(
           })
       }
     } else if (error.request) {
-      console.error('🌐 [API][RES] 네트워크 에러:', error.request)
-
       // 네트워크 오류는 항상 Toast로 표시
       import('@/composables/useToast')
         .then(({ toast }) => {
@@ -205,8 +161,6 @@ api.interceptors.response.use(
         .catch((err) => {
           console.error('❌ [API][RES] Toast 표시 실패:', err)
         })
-    } else {
-      console.error('⚙️ [API][RES] 요청 설정 에러:', error.message)
     }
 
     return Promise.reject(error)

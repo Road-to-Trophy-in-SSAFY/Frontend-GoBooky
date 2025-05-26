@@ -2,22 +2,15 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 /**
- * 지침에 따른 단순화된 인증 스토어
- * - 상태 관리만 담당
- * - 비즈니스 로직은 useAuth composable로 분리
+ * 지침에 따른 인증 스토어 - 단일 소스 오브 트루스
  * - Access token: 메모리에만 저장 (XSS 방지)
  * - Refresh token: HttpOnly 쿠키로 자동 관리 (CSRF 방지)
+ * - 상태 관리만 담당, 비즈니스 로직은 useAuth composable로 분리
  */
 export const useAuthStore = defineStore('auth', () => {
   // === State ===
   const user = ref(null)
   const accessToken = ref(null)
-
-  // 기존 Local Storage 데이터 정리 (한 번만 실행)
-  if (typeof window !== 'undefined' && localStorage.getItem('gobooky-auth')) {
-    console.log('🧹 [AuthStore] 기존 Local Storage 데이터 정리')
-    localStorage.removeItem('gobooky-auth')
-  }
 
   // === Getters ===
   const isAuthenticated = computed(() => {
@@ -41,10 +34,6 @@ export const useAuthStore = defineStore('auth', () => {
           isProfileComplete: user.value.is_profile_complete || false,
         }
       : null
-  })
-
-  const hasValidToken = computed(() => {
-    return Boolean(accessToken.value)
   })
 
   // === Actions (상태 변경만) ===
@@ -90,30 +79,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * 사용자 프로필 완성 상태 업데이트
-   * @param {boolean} isComplete 완성 여부
-   */
-  function setProfileComplete(isComplete) {
-    if (user.value) {
-      user.value.is_profile_complete = isComplete
-      console.log('✅ [AuthStore] 프로필 완성 상태 업데이트:', isComplete)
-    }
-  }
-
-  /**
-   * 쿠키 존재 여부 확인 (HttpOnly 쿠키는 직접 읽을 수 없으므로 API 호출로 확인)
-   * @param {string} cookieName 쿠키 이름
-   * @returns {boolean} 쿠키 존재 여부 (추정)
-   */
-  function hasCookie(cookieName) {
-    if (typeof document === 'undefined') return false
-    // HttpOnly 쿠키는 JavaScript에서 읽을 수 없으므로
-    // 일반 쿠키만 확인하고, 실제 존재 여부는 API 호출로 검증
-    return document.cookie.split(';').some((cookie) => cookie.trim().startsWith(cookieName + '='))
-  }
-
-  /**
-   * 앱 초기화 시 인증 상태 확인
+   * 앱 초기화 시 인증 상태 확인 (지침에 따른 initAuth 패턴)
    * @returns {Promise<boolean>} 인증 성공 여부
    */
   async function initAuth() {
@@ -126,21 +92,10 @@ export const useAuthStore = defineStore('auth', () => {
         return true
       }
 
-      // 첫 접속인지 확인 (sessionStorage 활용)
-      const hasVisited = sessionStorage.getItem('gobooky-visited')
-      console.log('🔍 [AuthStore] sessionStorage 확인:', { hasVisited })
-
-      if (!hasVisited) {
-        // 첫 접속 - API 호출 없이 게스트 모드
-        console.log('👤 [AuthStore] 첫 접속 - 게스트 모드')
-        sessionStorage.setItem('gobooky-visited', 'true')
-        return false
-      }
-
-      // 재방문 (새로고침 등) - silent refresh 시도
-      console.log('🔄 [AuthStore] 재방문 감지 - Silent refresh 시도')
-
+      // 새로고침 시에만 silent refresh 시도
+      console.log('🔄 [AuthStore] Silent refresh 시도')
       const success = await silentRefresh()
+
       if (success) {
         console.log('✅ [AuthStore] 토큰 갱신으로 인증 복구')
         return true
@@ -156,77 +111,27 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Silent refresh - 조용한 토큰 갱신 (초기화 시 사용)
+   * Silent refresh - 조용한 토큰 갱신 (지침에 따른 패턴)
    * @returns {Promise<boolean>} 성공 여부
    */
   async function silentRefresh() {
     try {
       console.log('🔄 [AuthStore] Silent refresh 시작')
 
-      // 쿠키 확인 (디버깅용)
-      console.log('🍪 [AuthStore] 현재 쿠키:', document.cookie)
-
       // 동적 import로 순환 참조 방지
       const { authAPI } = await import('@/api/auth')
-      console.log('📡 [AuthStore] authAPI import 완료, refresh 요청 시작')
-
       const response = await authAPI.refreshToken()
-      console.log('✅ [AuthStore] Silent refresh 응답 받음:', response)
 
       // 새 토큰과 사용자 정보 저장
       setAuth(response.access, response.user)
-      console.log('✅ [AuthStore] Silent refresh 성공 - 토큰 저장 완료')
+      console.log('✅ [AuthStore] Silent refresh 성공')
       return true
     } catch (error) {
-      console.error('❌ [AuthStore] Silent refresh 실패 상세:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message,
-        url: error.config?.url,
-        method: error.config?.method,
-        headers: error.config?.headers,
-        withCredentials: error.config?.withCredentials,
-      })
-
-      // Silent refresh는 실패해도 에러 로그를 출력하지 않음
+      // Silent refresh는 실패해도 조용히 처리
       // 401 에러는 정상적인 상황 (쿠키 없음 또는 만료)
       if (error.response?.status !== 401) {
         console.error('❌ [AuthStore] Silent refresh 예상치 못한 오류:', error)
-      } else {
-        console.log('ℹ️ [AuthStore] Silent refresh 401 - Refresh token 없음/만료')
       }
-      resetAuth()
-      return false
-    }
-  }
-
-  /**
-   * 토큰 갱신 (명시적 호출 시 사용)
-   * @returns {Promise<boolean>} 성공 여부
-   */
-  async function refreshToken() {
-    try {
-      console.log('🔄 [AuthStore] 토큰 갱신 시도')
-
-      // 동적 import로 순환 참조 방지
-      const { authAPI } = await import('@/api/auth')
-      const response = await authAPI.refreshToken()
-
-      console.log('🔍 [AuthStore] 토큰 갱신 응답:', response)
-
-      // 새 토큰과 사용자 정보 저장
-      setAuth(response.access, response.user)
-
-      console.log('✅ [AuthStore] 토큰 갱신 성공')
-      return true
-    } catch (error) {
-      console.error('❌ [AuthStore] 토큰 갱신 실패:', error)
-      console.error('❌ [AuthStore] 에러 상세:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      })
       resetAuth()
       return false
     }
@@ -240,20 +145,17 @@ export const useAuthStore = defineStore('auth', () => {
     // Getters
     isAuthenticated,
     userProfile,
-    hasValidToken,
 
     // Actions
     setAuth,
     resetAuth,
     updateUser,
     updateToken,
-    setProfileComplete,
     initAuth,
     silentRefresh,
-    refreshToken,
-    hasCookie,
   }
 })
+
 // 지침에 따라 persist 설정 완전 제거
 // Access Token은 메모리에만 저장 (XSS 방지)
 // Refresh Token은 HttpOnly 쿠키로 자동 관리 (CSRF 방지)

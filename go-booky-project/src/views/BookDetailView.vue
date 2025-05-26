@@ -20,6 +20,35 @@
             />
             <div class="cover-overlay">
               <div class="cover-actions">
+                <!-- 나의 책 저장 토글 버튼 -->
+                <button
+                  v-if="isAuthenticated"
+                  @click="toggleBookSave"
+                  :disabled="isSaveLoading"
+                  class="book-save-btn"
+                  :class="{ saved: book.is_saved }"
+                >
+                  <svg
+                    v-if="!isSaveLoading"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M19 21L12 16L5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21Z"
+                      :stroke="book.is_saved ? 'none' : 'currentColor'"
+                      :fill="book.is_saved ? 'currentColor' : 'none'"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  <div v-else class="save-spinner"></div>
+                  {{ book.is_saved ? '저장됨' : '나의 책에 저장' }}
+                </button>
+
                 <button
                   v-if="isAuthenticated"
                   @click="handleThreadWriteClick"
@@ -261,6 +290,7 @@ import Modal from '@/components/Modal.vue'
 import RelatedBooks from '@/components/RelatedBooks.vue'
 import { QuillEditor } from '@vueup/vue-quill'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
+import api from '@/api'
 
 const { selectedBook, fetchBook } = useBooks()
 const { createThread } = useThreads()
@@ -271,6 +301,7 @@ const book = computed(() => selectedBook.value)
 const showWriteModal = ref(false)
 const isLoading = ref(false)
 const isBookLoading = ref(false)
+const isSaveLoading = ref(false)
 const today = new Date().toISOString().split('T')[0]
 const imageError = ref(false)
 
@@ -332,6 +363,54 @@ const editorOptions = {
 // 로그인 페이지로 이동
 const goToLogin = () => {
   router.push({ name: 'Login' })
+}
+
+// 책 저장 토글 (Optimistic UI)
+const toggleBookSave = async () => {
+  if (!authStore.isAuthenticated) {
+    alert('로그인이 필요한 서비스입니다.')
+    router.push({ name: 'Login' })
+    return
+  }
+
+  if (!book.value) return
+
+  // Optimistic UI: 즉시 UI 업데이트
+  const originalIsSaved = book.value.is_saved
+  const originalSavedCount = book.value.saved_count || 0
+
+  // UI 즉시 업데이트
+  book.value.is_saved = !originalIsSaved
+  book.value.saved_count = originalIsSaved ? originalSavedCount - 1 : originalSavedCount + 1
+
+  isSaveLoading.value = true
+
+  try {
+    // API 호출
+    const response = await api.post(`/auth/books/${book.value.id}/save/`)
+
+    // 서버 응답으로 최종 상태 확정
+    book.value.is_saved = response.data.is_saved
+    book.value.saved_count = response.data.saved_count
+
+    console.log('✅ [BookDetailView] 책 저장 토글 성공:', response.data)
+  } catch (error) {
+    // 실패 시 원래 상태로 롤백
+    book.value.is_saved = originalIsSaved
+    book.value.saved_count = originalSavedCount
+
+    console.error('❌ [BookDetailView] 책 저장 토글 실패:', error)
+
+    if (error.response?.status === 401) {
+      alert('로그인이 만료되었습니다. 다시 로그인해주세요.')
+      authStore.resetAuth()
+      router.push({ name: 'Login' })
+    } else {
+      alert('책 저장에 실패했습니다. 다시 시도해주세요.')
+    }
+  } finally {
+    isSaveLoading.value = false
+  }
 }
 
 // 책 정보를 불러오는 함수
@@ -534,6 +613,7 @@ const submitThread = async () => {
   width: 100%;
 }
 
+.book-save-btn,
 .thread-write-btn,
 .login-prompt-btn {
   width: 100%;
@@ -550,13 +630,50 @@ const submitThread = async () => {
   font-size: 14px;
   cursor: pointer;
   transition: all 0.3s ease;
+  margin-bottom: 8px;
 }
 
+.book-save-btn:hover,
 .thread-write-btn:hover,
 .login-prompt-btn:hover {
   background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+}
+
+.book-save-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.book-save-btn:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+}
+
+.book-save-btn.saved {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.book-save-btn.saved:hover {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+}
+
+.book-save-btn:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.save-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 .login-prompt-btn {

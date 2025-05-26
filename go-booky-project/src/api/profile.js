@@ -15,19 +15,8 @@ export const profileAPI = {
    * @returns {Promise} 저장된 도서 목록
    */
   async getUserBooks(username, params = {}) {
-    try {
-      const response = await api.get(`/auth/auth/profile/${username}/books/`, { params })
-      return response.data
-    } catch (error) {
-      console.warn('❌ 사용자 도서 API 미구현 - 빈 데이터 반환')
-      // API가 구현되지 않은 경우 빈 데이터 반환
-      return {
-        results: [],
-        count: 0,
-        next: null,
-        previous: null,
-      }
-    }
+    const response = await api.get(`/auth/profile/${username}/books/`, { params })
+    return response.data
   },
 
   /**
@@ -36,7 +25,7 @@ export const profileAPI = {
    * @returns {Promise} 저장 상태
    */
   async toggleBookSave(bookId) {
-    const response = await api.post(`/books/books/${bookId}/save/`)
+    const response = await api.post(`/auth/books/${bookId}/save/`)
     return response.data
   },
 
@@ -47,18 +36,8 @@ export const profileAPI = {
    * @returns {Promise} 댓글 목록
    */
   async getUserComments(username, params = {}) {
-    try {
-      const response = await api.get(`/auth/auth/profile/${username}/comments/`, { params })
-      return response.data
-    } catch (error) {
-      console.warn('❌ 사용자 댓글 API 미구현 - 빈 데이터 반환')
-      return {
-        results: [],
-        count: 0,
-        next: null,
-        previous: null,
-      }
-    }
+    const response = await api.get(`/auth/profile/${username}/comments/`, { params })
+    return response.data
   },
 
   /**
@@ -68,18 +47,8 @@ export const profileAPI = {
    * @returns {Promise} 쓰레드 목록
    */
   async getUserThreads(username, params = {}) {
-    try {
-      const response = await api.get(`/auth/auth/profile/${username}/threads/`, { params })
-      return response.data
-    } catch (error) {
-      console.warn('❌ 사용자 쓰레드 API 미구현 - 빈 데이터 반환')
-      return {
-        results: [],
-        count: 0,
-        next: null,
-        previous: null,
-      }
-    }
+    const response = await api.get(`/auth/profile/${username}/threads/`, { params })
+    return response.data
   },
 
   /**

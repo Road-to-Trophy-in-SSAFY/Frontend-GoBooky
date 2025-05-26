@@ -198,53 +198,48 @@ export function useMultiStepForm(steps, options = {}) {
     stepData.value = {}
 
     if (persistProgress) {
-      localStorage.removeItem(storageKey)
+      sessionStorage.removeItem(storageKey)
     }
   }
 
   /**
-   * 진행 상태 저장 (로컬 스토리지)
+   * 진행 상태 저장 (세션 스토리지)
    */
   const saveProgress = () => {
-    if (!persistProgress) return
-
     const progress = {
       currentStep: currentStep.value,
       completedSteps: Array.from(completedSteps.value),
       stepData: stepData.value,
       timestamp: Date.now(),
     }
-
-    localStorage.setItem(storageKey, JSON.stringify(progress))
+    sessionStorage.setItem(storageKey, JSON.stringify(progress))
+    console.log('💾 [MultiStepForm] 진행 상태 저장:', progress)
   }
 
   /**
-   * 진행 상태 복원 (로컬 스토리지)
+   * 진행 상태 복원 (세션 스토리지)
    */
   const restoreProgress = () => {
-    if (!persistProgress) return
-
     try {
-      const saved = localStorage.getItem(storageKey)
-      if (!saved) return
+      const saved = sessionStorage.getItem(storageKey)
+      if (saved) {
+        const progress = JSON.parse(saved)
 
-      const progress = JSON.parse(saved)
-
-      // 24시간 이내의 데이터만 복원
-      const dayInMs = 24 * 60 * 60 * 1000
-      if (Date.now() - progress.timestamp > dayInMs) {
-        localStorage.removeItem(storageKey)
-        return
+        // 24시간 이내의 데이터만 복원 (세션 만료 방지)
+        const isRecent = Date.now() - progress.timestamp < 24 * 60 * 60 * 1000
+        if (isRecent) {
+          currentStep.value = progress.currentStep
+          completedSteps.value = new Set(progress.completedSteps)
+          stepData.value = progress.stepData
+          console.log('🔄 [MultiStepForm] 진행 상태 복원:', progress)
+        } else {
+          sessionStorage.removeItem(storageKey)
+          console.log('⏰ [MultiStepForm] 만료된 진행 상태 삭제')
+        }
       }
-
-      currentStep.value = progress.currentStep || initialStep
-      completedSteps.value = new Set(progress.completedSteps || [])
-      stepData.value = progress.stepData || {}
-
-      console.log('✅ [useMultiStepForm] 진행 상태 복원 완료')
     } catch (error) {
-      console.error('❌ [useMultiStepForm] 진행 상태 복원 실패:', error)
-      localStorage.removeItem(storageKey)
+      console.error('❌ [MultiStepForm] 진행 상태 복원 실패:', error)
+      sessionStorage.removeItem(storageKey)
     }
   }
 

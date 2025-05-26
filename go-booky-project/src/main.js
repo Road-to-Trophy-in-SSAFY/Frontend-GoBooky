@@ -1,24 +1,21 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 
 import App from '@/App.vue'
 import router from '@/router'
-import { authGate } from '@/bootstrap/authGate'
 
 /**
- * 부트스트랩 게이트 패턴을 적용한 Vue 앱 초기화
+ * 지침에 따른 Vue 앱 초기화
+ * - Access Token: 메모리에만 저장 (XSS 방지)
+ * - Refresh Token: HttpOnly 쿠키로 자동 관리 (CSRF 방지)
  * - 앱 마운트 전에 세션 복구 완료
- * - 새로고침 시 로그아웃 방지
- * - 라우터 가드 설정
  */
 
 console.log('🚀 [APP] GoBooky 앱 초기화 시작...')
 
-// Pinia 생성 및 플러그인 추가
+// Pinia 생성 (persist 플러그인 제거 - 지침에 따라 메모리에만 저장)
 const app = createApp(App)
 const pinia = createPinia()
-pinia.use(piniaPluginPersistedstate)
 app.use(pinia)
 
 // 글로벌 에러 핸들링
@@ -35,26 +32,19 @@ app.config.errorHandler = (err, instance, info) => {
   }
 }
 
-// 글로벌 경고 핸들링
-app.config.warnHandler = (msg, instance, trace) => {
-  console.warn('⚠️ [APP] 글로벌 경고:', {
-    message: msg,
-    instance,
-    trace,
-  })
-}
-
 /**
- * 부트스트랩 게이트 패턴을 적용한 앱 초기화
+ * 지침에 따른 앱 초기화
  */
 async function initializeApp() {
   const startTime = performance.now()
 
   try {
-    console.log('🔍 [APP] 부트스트랩 게이트 패턴 적용 중...')
+    console.log('🔍 [APP] 인증 상태 초기화 중...')
 
-    // 1. 라우터 마운트 전에 세션 복구 완료
-    await authGate(router)
+    // 1. 라우터 마운트 전에 세션 복구 완료 (지침에 따른 패턴)
+    const { useAuthStore } = await import('@/stores/auth')
+    const authStore = useAuthStore()
+    await authStore.initAuth()
 
     // 2. 라우터 설정 (세션 복구 후)
     app.use(router)
@@ -67,11 +57,11 @@ async function initializeApp() {
       apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
     })
   } catch (error) {
-    console.error('❌ [APP] 부트스트랩 게이트 실패:', error)
+    console.error('❌ [APP] 초기화 실패:', error)
 
-    // 부트스트랩 게이트 실패해도 앱은 정상적으로 시작
+    // 초기화 실패해도 앱은 정상적으로 시작
     app.use(router)
-    console.log('👤 [APP] 부트스트랩 게이트 실패 - 기본 모드로 시작')
+    console.log('👤 [APP] 초기화 실패 - 기본 모드로 시작')
   }
 
   try {

@@ -116,9 +116,30 @@ const router = createRouter({
 })
 
 /**
- * 라우터 가드는 authGate에서 처리됩니다.
- * 부트스트랩 게이트 패턴을 통해 앱 초기화 시 설정됩니다.
+ * 지침에 따른 라우터 가드 - 메타 + 가드 패턴
+ * - 라우트마다 meta.requiresAuth 지정
+ * - beforeEach에서 한 번에 검사·리다이렉트
+ * - 페이지별 중복 코드 제거
  */
+router.beforeEach(async (to) => {
+  const { useAuthStore } = await import('@/stores/auth')
+  const auth = useAuthStore()
+
+  // 인증이 필요한 페이지 처리
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    // 인증되지 않은 상태에서 한 번 더 시도
+    await auth.initAuth()
+
+    if (!auth.isAuthenticated) {
+      return { name: 'Login', query: { next: to.fullPath } }
+    }
+  }
+
+  // Guest 전용 페이지 처리 (이미 로그인된 사용자는 접근 불가)
+  if (to.meta.requiresGuest && auth.isAuthenticated) {
+    return { name: 'home' }
+  }
+})
 
 /**
  * 라우터 이동 후 처리

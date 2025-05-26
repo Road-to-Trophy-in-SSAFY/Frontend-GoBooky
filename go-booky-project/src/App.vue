@@ -1,51 +1,51 @@
 <template>
   <div id="app">
-    <!-- 부트스트랩 게이트 로딩 중 스플래시 화면 -->
-    <div v-if="isBootstrapping" class="splash-screen">
-      <div class="splash-content">
-        <div class="logo">
-          <img src="/logo.png" alt="GoBooky" />
-        </div>
-        <div class="loading-spinner"></div>
-        <p class="loading-text">GoBooky 로딩 중...</p>
-      </div>
-    </div>
-
     <!-- 메인 앱 -->
-    <Suspense v-else>
+    <Suspense>
       <RouterView />
+
+      <!-- 로딩 중 폴백 -->
+      <template #fallback>
+        <div class="loading-screen">
+          <div class="loading-content">
+            <div class="logo">
+              <img src="/logo.png" alt="GoBooky" />
+            </div>
+            <div class="loading-spinner"></div>
+            <p class="loading-text">페이지 로딩 중...</p>
+          </div>
+        </div>
+      </template>
     </Suspense>
 
-    <!-- 토스트 알림 -->
+    <!-- 전역 토스트 알림 -->
     <Toast />
   </div>
 </template>
 
 <script setup>
 import { RouterView } from 'vue-router'
-import { ref, onMounted } from 'vue'
 import Toast from '@/components/Toast.vue'
 
-// 부트스트랩 게이트 로딩 상태
-const isBootstrapping = ref(true)
+/**
+ * 지침에 따른 단순한 App.vue
+ * - 복잡한 부트스트랩 로직 제거
+ * - Suspense로 비동기 컴포넌트 로딩 처리
+ * - 전역 Toast 컴포넌트 포함
+ */
 
-onMounted(() => {
-  // 부트스트랩 게이트가 완료되면 스플래시 화면 숨김
-  // main.js에서 authGate가 완료된 후 앱이 마운트되므로
-  // 약간의 지연 후 스플래시 화면을 숨깁니다
-  setTimeout(() => {
-    isBootstrapping.value = false
-  }, 100)
+defineOptions({
+  name: 'App',
 })
 </script>
 
 <style scoped>
 #app {
   width: 100%;
-  height: 100vh;
+  min-height: 100vh;
 }
 
-.splash-screen {
+.loading-screen {
   position: fixed;
   top: 0;
   left: 0;
@@ -58,7 +58,7 @@ onMounted(() => {
   z-index: 9999;
 }
 
-.splash-content {
+.loading-content {
   text-align: center;
   color: white;
 }
@@ -102,7 +102,7 @@ onMounted(() => {
 
 /* 다크 모드 대응 */
 @media (prefers-color-scheme: dark) {
-  .splash-screen {
+  .loading-screen {
     background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
   }
 }

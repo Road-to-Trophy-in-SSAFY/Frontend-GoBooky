@@ -102,6 +102,28 @@ export function useBooks() {
   }
 
   /**
+   * 책 저장/해제 토글
+   * @param {number} bookId 도서 ID
+   * @returns {Promise} 토글 결과
+   */
+  const toggleBookSave = async (bookId) => {
+    try {
+      const response = await execute(() => booksAPI.toggleBookSave(bookId))
+
+      // 현재 선택된 책이 토글된 책과 같다면 상태 업데이트
+      if (selectedBook.value && selectedBook.value.id === bookId) {
+        selectedBook.value.is_saved = response.is_saved
+        selectedBook.value.saved_count = response.saved_count
+      }
+
+      return response
+    } catch (err) {
+      console.error('❌ [useBooks] 책 저장 토글 실패:', err)
+      throw err
+    }
+  }
+
+  /**
    * 상태 초기화
    */
   const resetBooks = () => {
@@ -129,6 +151,7 @@ export function useBooks() {
     fetchBook,
     fetchBooksByCategory,
     searchBooks,
+    toggleBookSave,
     setSelectedBook,
     setSelectedCategory,
     resetBooks,

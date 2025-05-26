@@ -289,12 +289,5 @@ export const useThreadStore = defineStore(
       reset,
     }
   },
-  {
-    // 지침에 따른 persist 설정
-    persist: {
-      key: 'gobooky-threads',
-      storage: sessionStorage, // 세션 스토리지 사용 (탭 닫으면 초기화)
-      paths: ['filters'], // 필터 설정만 유지
-    },
-  },
+  // 지침에 따라 persist 설정 제거 - 메모리에만 저장
 )

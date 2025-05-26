@@ -48,7 +48,7 @@ onMounted(async () => {
 const resendEmail = async () => {
   resendDisabled.value = true
   try {
-    const email = localStorage.getItem('pending_email')
+    const email = sessionStorage.getItem('pending_email')
     if (!email) {
       modalText.value = '이메일 정보가 없습니다. 회원가입을 다시 진행해 주세요.'
       return

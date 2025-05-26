@@ -98,14 +98,14 @@ const isLoggingIn = computed(() => isLoading.value)
 // 지침에 따른 검증 시스템 사용
 const { errors, validate, clearErrors } = useValidation(combinedSchemas.login)
 
-// 컴포넌트 마운트 시 localStorage에서 이메일 복원
+// 컴포넌트 마운트 시 sessionStorage에서 이메일 복원
 onMounted(() => {
-  email.value = localStorage.getItem('login_email') || ''
+  email.value = sessionStorage.getItem('login_email') || ''
 })
 
-// 이메일이 변경될 때마다 localStorage에 저장
+// 이메일이 변경될 때마다 sessionStorage에 저장
 watch(email, (newValue) => {
-  localStorage.setItem('login_email', newValue)
+  sessionStorage.setItem('login_email', newValue)
 })
 
 function togglePassword() {
