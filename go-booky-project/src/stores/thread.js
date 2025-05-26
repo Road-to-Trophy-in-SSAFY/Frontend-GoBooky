@@ -11,7 +11,7 @@ export const useThreadStore = defineStore(
   'thread',
   () => {
     // === State ===
-    const threads = ref([])
+    const threadsMap = ref(new Map()) // ID를 키로 하는 Map으로 변경
     const threadDetail = ref(null)
     const pagination = ref({
       page: 1,
@@ -28,12 +28,12 @@ export const useThreadStore = defineStore(
     })
 
     // === Getters ===
-    const hasThreads = computed(() => threads.value.length > 0)
+    const threads = computed(() => Array.from(threadsMap.value.values()))
 
     const getThreadById = computed(() => {
       return (id) => {
         const numericId = parseInt(id)
-        return threads.value.find((thread) => thread.id === numericId)
+        return threadsMap.value.get(numericId) || null
       }
     })
 
@@ -65,9 +65,27 @@ export const useThreadStore = defineStore(
      * 쓰레드 목록 설정
      * @param {Array} threadList 쓰레드 목록
      */
-    function setThreads(threadList) {
-      threads.value = threadList
-      console.log('✅ [ThreadStore] 쓰레드 목록 설정 완료:', threadList.length)
+    function setThreads(threadList, append = false) {
+      if (append) {
+        // 무한 스크롤: 기존 데이터에 추가
+        threadList.forEach((thread) => {
+          if (!threadsMap.value.has(thread.id)) {
+            threadsMap.value.set(thread.id, thread)
+          }
+        })
+      } else {
+        // 새로운 데이터로 교체
+        const newThreadsMap = new Map()
+        threadList.forEach((thread) => {
+          newThreadsMap.set(thread.id, thread)
+        })
+        threadsMap.value = newThreadsMap
+      }
+      console.log(
+        '✅ [ThreadStore] 쓰레드 목록 설정:',
+        threadList.length,
+        append ? '(추가)' : '(교체)',
+      )
     }
 
     /**
@@ -75,8 +93,20 @@ export const useThreadStore = defineStore(
      * @param {Object} thread 쓰레드 객체
      */
     function setThreadDetail(thread) {
+      if (!thread) {
+        threadDetail.value = null
+        return
+      }
+
+      // 상세 정보 업데이트
       threadDetail.value = thread
-      console.log('✅ [ThreadStore] 쓰레드 상세 설정 완료:', thread?.id)
+
+      // 목록에도 동일한 쓰레드가 있다면 함께 업데이트
+      if (threadsMap.value.has(thread.id)) {
+        threadsMap.value.set(thread.id, { ...thread })
+      }
+
+      console.log('✅ [ThreadStore] 쓰레드 상세 설정:', thread.id)
     }
 
     /**
@@ -100,7 +130,7 @@ export const useThreadStore = defineStore(
      * @param {Object} thread 새 쓰레드
      */
     function addThread(thread) {
-      threads.value.unshift(thread)
+      threadsMap.value.set(thread.id, thread)
       console.log('✅ [ThreadStore] 쓰레드 추가 완료:', thread.id)
     }
 
@@ -111,9 +141,8 @@ export const useThreadStore = defineStore(
      */
     function updateThread(threadId, updatedThread) {
       const numericThreadId = parseInt(threadId)
-      const index = threads.value.findIndex((thread) => thread.id === numericThreadId)
-      if (index !== -1) {
-        threads.value[index] = updatedThread
+      if (threadsMap.value.has(numericThreadId)) {
+        threadsMap.value.set(numericThreadId, updatedThread)
       }
 
       // 상세 페이지 데이터도 업데이트
@@ -130,7 +159,7 @@ export const useThreadStore = defineStore(
      */
     function removeThread(threadId) {
       const numericThreadId = parseInt(threadId)
-      threads.value = threads.value.filter((thread) => thread.id !== numericThreadId)
+      threadsMap.value.delete(numericThreadId)
 
       // 상세 페이지 데이터도 초기화
       if (threadDetail.value?.id === numericThreadId) {
@@ -147,36 +176,41 @@ export const useThreadStore = defineStore(
      * @param {number} likesCount 좋아요 수
      */
     function updateThreadLike(threadId, liked, likesCount) {
-      // 🔧 타입 안전성 보장
       const numericThreadId = parseInt(threadId)
-      if (!numericThreadId || isNaN(numericThreadId)) {
-        console.error('❌ [ThreadStore] 유효하지 않은 쓰레드 ID:', threadId)
-        return
+
+      // 목록 업데이트
+      if (threadsMap.value.has(numericThreadId)) {
+        const thread = threadsMap.value.get(numericThreadId)
+        threadsMap.value.set(numericThreadId, {
+          ...thread,
+          liked,
+          likes_count: likesCount,
+        })
       }
 
-      // 목록에서 업데이트 (타입 안전한 비교)
-      const threadIndex = threads.value.findIndex((thread) => thread.id === numericThreadId)
-      if (threadIndex !== -1) {
-        threads.value[threadIndex].liked = liked
-        threads.value[threadIndex].likes_count = likesCount
-        console.log('🔄 [ThreadStore] 목록에서 좋아요 상태 업데이트:', numericThreadId, liked)
-      }
-
-      // 상세 페이지에서도 업데이트 (타입 안전한 비교)
+      // 상세 페이지 업데이트
       if (threadDetail.value?.id === numericThreadId) {
-        threadDetail.value.liked = liked
-        threadDetail.value.likes_count = likesCount
-        console.log('🔄 [ThreadStore] 상세에서 좋아요 상태 업데이트:', numericThreadId, liked)
+        threadDetail.value = {
+          ...threadDetail.value,
+          liked,
+          likes_count: likesCount,
+        }
       }
 
-      console.log('✅ [ThreadStore] 쓰레드 좋아요 상태 업데이트 완료:', numericThreadId, liked)
+      console.log('✅ [ThreadStore] 좋아요 상태 동기화:', {
+        threadId: numericThreadId,
+        liked,
+        likesCount,
+        inList: threadsMap.value.has(numericThreadId),
+        inDetail: threadDetail.value?.id === numericThreadId,
+      })
     }
 
     /**
      * 상태 초기화
      */
     function reset() {
-      threads.value = []
+      threadsMap.value.clear()
       threadDetail.value = null
       pagination.value = {
         page: 1,
@@ -202,7 +236,6 @@ export const useThreadStore = defineStore(
       filters,
 
       // Getters
-      hasThreads,
       getThreadById,
       filteredThreads,
 

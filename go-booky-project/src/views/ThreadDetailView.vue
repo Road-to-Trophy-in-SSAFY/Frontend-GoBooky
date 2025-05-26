@@ -5,16 +5,28 @@
 
     <!-- 쓰레드 이미지 표시 -->
     <div class="thread-image">
-      <img
-        v-if="threadImage !== '/logo.png'"
-        :src="threadImage"
-        alt="쓰레드 이미지"
-        class="cover-image"
-        @error="handleImageError"
-      />
-      <div v-else class="image-placeholder">
+      <!-- 이미지 로딩 중 -->
+      <div v-if="imageState.loading" class="image-placeholder">
         <div class="loading-spinner"></div>
         <p>이미지 생성 중...</p>
+      </div>
+
+      <!-- 실제 이미지 -->
+      <img
+        v-else-if="imageState.showActualImage"
+        :src="imageState.actualImageUrl"
+        alt="쓰레드 이미지"
+        class="cover-image"
+        @load="handleImageLoad"
+        @error="handleImageError"
+      />
+
+      <!-- 대체 이미지 -->
+      <div v-else class="default-image-container">
+        <img src="/logo.png" alt="기본 이미지" class="cover-image default" />
+        <div class="image-overlay">
+          <p>이미지가 생성되지 않았습니다</p>
+        </div>
       </div>
     </div>
 
@@ -40,8 +52,8 @@
           <span :key="likesCount" class="like-count">{{ likesCount }}</span>
         </Transition>
       </button>
-      <button @click="showEditModal = true" class="edit-btn">수정</button>
-      <button @click="showDeleteModal = true" class="delete-btn">삭제</button>
+      <button v-if="isThreadOwner" @click="showEditModal = true" class="edit-btn">수정</button>
+      <button v-if="isThreadOwner" @click="showDeleteModal = true" class="delete-btn">삭제</button>
     </div>
 
     <!-- 수정 모달 -->
@@ -103,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Modal from '@/components/Modal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
@@ -114,6 +126,7 @@ import { useThreads } from '@/composables/useThreads'
 import { useValidation, combinedSchemas } from '@/composables/useValidation'
 import { useToast } from '@/composables/useToast'
 import { useAnimation } from '@/composables/useAnimation'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -130,12 +143,22 @@ const {
 const { validate, clearErrors } = useValidation(combinedSchemas.threadUpdate)
 const { error: showErrorToast } = useToast()
 const { startAnimation, isAnimating } = useAnimation()
+const authStore = useAuthStore()
 
 const thread = computed(() => selectedThread.value)
 const showEditModal = ref(false)
 const showDeleteModal = ref(false)
 const isLiked = computed(() => thread.value?.liked || false)
 const likesCount = computed(() => thread.value?.likes_count || 0)
+
+// 현재 사용자가 쓰레드 작성자인지 확인
+const isThreadOwner = computed(() => {
+  if (!thread.value || !authStore.user) {
+    return false
+  }
+  // ThreadDetailSerializer에서 user 객체를 반환하므로 user.id로 접근
+  return thread.value.user?.id === authStore.user.id
+})
 const editForm = ref({
   title: '',
   content: '',
@@ -143,36 +166,91 @@ const editForm = ref({
   book: null,
 })
 
+// 이미지 상태 관리
+const imageState = ref({
+  loading: false,
+  showActualImage: false,
+  actualImageUrl: null,
+  hasError: false,
+  loadAttempted: false,
+})
+
 // API URL
 const API_URL = 'http://127.0.0.1:8000'
 
-// 쓰레드 이미지 계산
-const threadImage = computed(() => {
-  if (thread.value) {
-    // 1. cover_img_url이 있으면 우선 사용 (백엔드에서 제공하는 완전한 URL)
-    if (thread.value.cover_img_url) {
-      console.log('🖼️ [ThreadDetailView] cover_img_url 사용:', thread.value.cover_img_url)
-      return thread.value.cover_img_url
-    }
+// 이미지 상태 초기화 및 로딩 로직
+const initializeImageState = () => {
+  if (!thread.value) return
 
-    // 2. cover_img 필드가 있으면 사용
-    if (thread.value.cover_img) {
-      // 절대 경로인지 확인
-      if (thread.value.cover_img.startsWith('http')) {
-        console.log('🖼️ [ThreadDetailView] 절대 경로 cover_img 사용:', thread.value.cover_img)
-        return thread.value.cover_img
-      }
-      // 상대 경로면 API URL과 결합
-      const imageUrl = `${API_URL}/media/${thread.value.cover_img}`
-      console.log('🖼️ [ThreadDetailView] 상대 경로 cover_img 사용:', imageUrl)
-      return imageUrl
+  // 상태 초기화
+  imageState.value = {
+    loading: false,
+    showActualImage: false,
+    actualImageUrl: null,
+    hasError: false,
+    loadAttempted: false,
+  }
+
+  // 이미지 URL 확인
+  let imageUrl = null
+
+  if (thread.value.cover_img_url) {
+    imageUrl = thread.value.cover_img_url
+  } else if (thread.value.cover_img) {
+    if (thread.value.cover_img.startsWith('http')) {
+      imageUrl = thread.value.cover_img
+    } else {
+      imageUrl = `${API_URL}/media/${thread.value.cover_img}`
     }
   }
 
-  // 기본 이미지 사용
-  console.log('🖼️ [ThreadDetailView] 기본 이미지 사용')
-  return '/logo.png'
-})
+  if (imageUrl) {
+    // 이미지가 있는 경우 로딩 시작
+    imageState.value.loading = true
+    imageState.value.actualImageUrl = imageUrl
+    imageState.value.loadAttempted = true
+
+    // 이미지 프리로드
+    const img = new Image()
+    img.onload = () => {
+      imageState.value.loading = false
+      imageState.value.showActualImage = true
+    }
+    img.onerror = () => {
+      imageState.value.loading = false
+      imageState.value.hasError = true
+      console.warn('🖼️ [ThreadDetailView] 이미지 로드 실패:', imageUrl)
+    }
+    img.src = imageUrl
+  } else {
+    // 이미지가 없는 경우 바로 대체 이미지 표시
+    imageState.value.loading = false
+    imageState.value.loadAttempted = true
+  }
+}
+
+// 이미지 로드 성공 핸들러
+const handleImageLoad = () => {
+  console.log('✅ [ThreadDetailView] 이미지 로드 성공')
+}
+
+// 이미지 로드 실패 핸들러
+const handleImageError = () => {
+  console.warn('❌ [ThreadDetailView] 이미지 로드 실패')
+  imageState.value.showActualImage = false
+  imageState.value.hasError = true
+}
+
+// 쓰레드 변경 시 이미지 상태 초기화
+watch(
+  thread,
+  (newThread) => {
+    if (newThread) {
+      initializeImageState()
+    }
+  },
+  { immediate: true },
+)
 
 const editorOptions = {
   modules: {
@@ -225,6 +303,13 @@ const formatDate = (dateString) => {
 
 const handleUpdateThread = async () => {
   try {
+    // 권한 체크
+    if (!isThreadOwner.value) {
+      console.error('❌ [ThreadDetailView] 수정 권한 없음')
+      showErrorToast('수정 권한이 없습니다.')
+      return
+    }
+
     clearErrors()
 
     // 수정용 검증 (book 필드 제외)
@@ -271,6 +356,13 @@ const handleUpdateThread = async () => {
 
 const confirmDelete = async () => {
   try {
+    // 권한 체크
+    if (!isThreadOwner.value) {
+      console.error('❌ [ThreadDetailView] 삭제 권한 없음')
+      showErrorToast('삭제 권한이 없습니다.')
+      return
+    }
+
     const threadId = parseInt(route.params.id)
     if (!threadId || isNaN(threadId)) {
       console.error('❌ [ThreadDetailView] 유효하지 않은 쓰레드 ID:', route.params.id)
@@ -309,13 +401,6 @@ const handleLikeThread = async () => {
   }
 }
 
-const handleImageError = () => {
-  console.log('🖼️ [ThreadDetailView] 이미지 로드 실패 - 기본 이미지 사용')
-}
-
-// 이미지가 없는 경우 주기적으로 쓰레드 정보 새로고침
-let imageCheckInterval = null
-
 onMounted(async () => {
   // 컴포넌트 마운트 시 ID 유효성 검사
   const threadId = parseInt(route.params.id)
@@ -326,30 +411,6 @@ onMounted(async () => {
   }
 
   await loadThread()
-
-  // 이미지가 없으면 주기적으로 확인
-  if (!thread.value?.cover_img_url && !thread.value?.cover_img) {
-    console.log('🔄 [ThreadDetailView] 이미지 생성 대기 중 - 주기적 확인 시작')
-    imageCheckInterval = setInterval(async () => {
-      try {
-        await fetchThread(threadId)
-        if (thread.value?.cover_img_url || thread.value?.cover_img) {
-          console.log('✅ [ThreadDetailView] 이미지 생성 완료 - 주기적 확인 중단')
-          clearInterval(imageCheckInterval)
-        }
-      } catch (error) {
-        console.error('❌ [ThreadDetailView] 이미지 확인 실패:', error)
-      }
-    }, 3000) // 3초마다 확인
-  }
-})
-
-// 컴포넌트 언마운트 시 인터벌 정리
-import { onUnmounted } from 'vue'
-onUnmounted(() => {
-  if (imageCheckInterval) {
-    clearInterval(imageCheckInterval)
-  }
 })
 </script>
 
@@ -400,6 +461,48 @@ onUnmounted(() => {
   100% {
     transform: rotate(360deg);
   }
+}
+
+/* 대체 이미지 컨테이너 스타일 */
+.default-image-container {
+  position: relative;
+  height: 300px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #f8f9fa;
+}
+
+.default-image-container .cover-image.default {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.3;
+  filter: grayscale(100%);
+}
+
+.image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #6c757d;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  pointer-events: none;
+}
+
+.image-overlay p {
+  margin: 0;
+  padding: 8px 16px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .content {

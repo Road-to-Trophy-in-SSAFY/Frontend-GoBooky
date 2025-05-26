@@ -23,7 +23,7 @@
     <!-- 쓰레드 목록 -->
     <div class="thread-content">
       <!-- 로딩 상태 (초기 로드) -->
-      <div v-if="loading && allThreads.length === 0" class="loading-container">
+      <div v-if="isLoading && threads.length === 0" class="loading-container">
         <div class="loading-spinner"></div>
         <p>독서 기록을 불러오는 중...</p>
       </div>
@@ -37,7 +37,12 @@
           :data-id="thread.id"
         >
           <div class="thread-image">
-            <img :src="getThreadImage(thread)" alt="쓰레드 이미지" class="cover-thumbnail" />
+            <img
+              :src="getThreadImage(thread)"
+              alt="쓰레드 이미지"
+              class="cover-thumbnail"
+              @error="handleImageError($event, thread)"
+            />
           </div>
           <div class="thread-info">
             <h3>{{ thread.title }}</h3>
@@ -80,7 +85,7 @@
       </div>
 
       <!-- 더 이상 로드할 데이터가 없을 때 -->
-      <div v-if="!hasMore && allThreads.length > 0" class="end-message">
+      <div v-if="!hasMore && threads.length > 0" class="end-message">
         <p>모든 독서 기록을 확인했습니다.</p>
       </div>
 
@@ -104,7 +109,14 @@ import { useToast } from '@/composables/useToast'
 import { useAnimation } from '@/composables/useAnimation'
 
 // 지침에 따른 Composables 사용
-const { fetchThreads, toggleLike: toggleThreadLike } = useThreads()
+const {
+  threads,
+  pagination,
+  isLoading,
+  error,
+  fetchThreads,
+  toggleLike: toggleThreadLike,
+} = useThreads()
 const { error: showErrorToast } = useToast()
 const { startAnimation, isAnimating } = useAnimation()
 const router = useRouter()
@@ -115,14 +127,12 @@ const selectedCategory = ref(null)
 const API_URL = 'http://127.0.0.1:8000'
 
 // 무한 스크롤 관련 상태
-const allThreads = ref([])
-const loading = ref(false)
 const loadingMore = ref(false)
-const error = ref(null)
-const currentPage = ref(1)
-const hasMore = ref(true)
 const scrollSentinel = ref(null)
 const observer = ref(null)
+
+// computed 속성들
+const hasMore = computed(() => pagination.value.hasNext)
 
 onMounted(async () => {
   await loadInitialThreads()
@@ -138,34 +148,12 @@ onUnmounted(() => {
 // 초기 쓰레드 로드
 const loadInitialThreads = async () => {
   try {
-    loading.value = true
-    error.value = null
-    currentPage.value = 1
-
     console.log('🧵 [ThreadListView] 초기 쓰레드 로드 시작')
-
-    const response = await fetchThreads({ page: 1 })
-
-    if (response.results) {
-      // DRF 페이지네이션 응답
-      allThreads.value = response.results
-      hasMore.value = !!response.next
-      console.log('✅ [ThreadListView] 페이지네이션 응답:', {
-        count: response.results.length,
-        total: response.count,
-        hasNext: !!response.next,
-      })
-    } else {
-      // 일반 배열 응답
-      allThreads.value = response
-      hasMore.value = false
-      console.log('✅ [ThreadListView] 배열 응답:', response.length)
-    }
+    await fetchThreads({ page: 1 })
+    console.log('✅ [ThreadListView] 초기 로드 완료:', threads.value.length)
   } catch (err) {
     console.error('❌ [ThreadListView] 초기 로드 실패:', err)
-    error.value = '독서 기록을 불러오는데 실패했습니다.'
-  } finally {
-    loading.value = false
+    showErrorToast('독서 기록을 불러오는데 실패했습니다.')
   }
 }
 
@@ -177,26 +165,17 @@ const loadMoreThreads = async () => {
 
   try {
     loadingMore.value = true
-    const nextPage = currentPage.value + 1
+    const nextPage = pagination.value.page + 1
 
     console.log('🔄 [ThreadListView] 추가 쓰레드 로드:', nextPage)
 
     const response = await fetchThreads({ page: nextPage })
 
-    if (response.results) {
-      // 기존 데이터에 새 데이터 추가
-      allThreads.value = [...allThreads.value, ...response.results]
-      hasMore.value = !!response.next
-      currentPage.value = nextPage
-
-      console.log('✅ [ThreadListView] 추가 로드 완료:', {
-        newCount: response.results.length,
-        totalCount: allThreads.value.length,
-        hasMore: hasMore.value,
-      })
-    } else {
-      hasMore.value = false
-    }
+    console.log('✅ [ThreadListView] 추가 로드 완료:', {
+      newCount: response.results?.length || 0,
+      totalCount: threads.value.length,
+      hasMore: hasMore.value,
+    })
   } catch (err) {
     console.error('❌ [ThreadListView] 추가 로드 실패:', err)
     showErrorToast('추가 데이터를 불러오는데 실패했습니다.')
@@ -248,13 +227,22 @@ const getThreadImage = (thread) => {
   return '/logo.png'
 }
 
+// 이미지 로드 실패 핸들러
+const handleImageError = (event, thread) => {
+  console.warn('❌ [ThreadListView] 이미지 로드 실패:', thread.id)
+  // 기본 이미지로 대체
+  event.target.src = '/logo.png'
+  // 에러 발생 시 더 이상 에러 이벤트가 발생하지 않도록 처리
+  event.target.onerror = null
+}
+
 const selectCategory = (categoryName) => {
   selectedCategory.value = categoryName
 }
 
 const filteredThreads = computed(() => {
-  if (!selectedCategory.value) return allThreads.value
-  return allThreads.value.filter((thread) => thread.book.category_name === selectedCategory.value)
+  if (!selectedCategory.value) return threads.value
+  return threads.value.filter((thread) => thread.book.category_name === selectedCategory.value)
 })
 
 const goToThreadDetail = (threadId) => {
@@ -263,25 +251,15 @@ const goToThreadDetail = (threadId) => {
 
 const toggleLike = async (thread) => {
   try {
-    // 애니메이션 시작 (지침 준수: "비즈니스 로직은 훅으로")
+    // 애니메이션 시작
     startAnimation(thread.id)
 
+    // Pinia store를 통한 좋아요 토글 (Optimistic UI 포함)
     await toggleThreadLike(thread.id)
-
-    // 로컬 상태 업데이트
-    const threadIndex = allThreads.value.findIndex((t) => t.id === thread.id)
-    if (threadIndex !== -1) {
-      const updatedThread = { ...allThreads.value[threadIndex] }
-      updatedThread.liked = !updatedThread.liked
-      updatedThread.likes_count += updatedThread.liked ? 1 : -1
-      allThreads.value[threadIndex] = updatedThread
-    }
 
     console.log('✅ [ThreadListView] 좋아요 토글 성공:', thread.id)
   } catch (error) {
     console.error('❌ [ThreadListView] 좋아요 토글 실패:', error)
-
-    // 사용자에게 에러 알림 (지침 준수: "일관된 UX")
     showErrorToast(error.message || '로그인 후 이용 가능합니다.')
   }
 }
