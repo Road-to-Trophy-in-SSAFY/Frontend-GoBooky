@@ -117,10 +117,11 @@ export const authAPI = {
 
   /**
    * 계정 삭제
+   * @param {Object} data 삭제 요청 데이터 (비밀번호 포함)
    * @returns {Promise} 삭제 응답
    */
-  async deleteAccount() {
-    const response = await api.delete('/auth/auth/account/')
+  async deleteAccount(data) {
+    const response = await api.delete('/auth/auth/account/', { data })
     return response.data
   },
 
