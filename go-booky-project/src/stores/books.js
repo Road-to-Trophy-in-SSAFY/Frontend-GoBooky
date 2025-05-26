@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { categoriesData } from './categoriesData.js'
+import { categoriesData } from '@/stores/categoriesData.js'
 
 /**
  * 지침에 따른 단순화된 도서 스토어

@@ -2,9 +2,9 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 
-import App from './App.vue'
-import router from './router'
-import { authGate } from './bootstrap/authGate'
+import App from '@/App.vue'
+import router from '@/router'
+import { authGate } from '@/bootstrap/authGate'
 
 /**
  * 부트스트랩 게이트 패턴을 적용한 Vue 앱 초기화
@@ -112,8 +112,8 @@ async function initializeApp() {
           앱을 로드하는 중 오류가 발생했습니다.<br>
           페이지를 새로고침하거나 잠시 후 다시 시도해주세요.
         </p>
-        <button 
-          onclick="window.location.reload()" 
+        <button
+          onclick="window.location.reload()"
           style="
             background: #3498db;
             color: white;
@@ -152,8 +152,8 @@ initializeApp().catch((error) => {
         시스템 초기화 중 오류가 발생했습니다.<br>
         관리자에게 문의하거나 잠시 후 다시 시도해주세요.
       </p>
-      <button 
-        onclick="window.location.reload()" 
+      <button
+        onclick="window.location.reload()"
         style="
           background: #e74c3c;
           color: white;

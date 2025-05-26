@@ -1,8 +1,8 @@
 import { ref, computed } from 'vue'
 import { threadsAPI } from '@/api/threads'
-import { useApi } from './useApi'
+import { useApi } from '@/composables/useApi'
 import { useThreadStore } from '@/stores/thread'
-import { useToast } from './useToast'
+import { useToast } from '@/composables/useToast'
 
 /**
  * 지침에 따른 쓰레드 Composable

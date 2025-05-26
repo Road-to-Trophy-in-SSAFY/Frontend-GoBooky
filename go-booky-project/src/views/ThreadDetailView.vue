@@ -91,6 +91,9 @@
       confirm-text="삭제"
       @confirm="confirmDelete"
     />
+
+    <!-- 댓글 섹션 -->
+    <CommentSection :thread-id="parseInt(route.params.id)" />
   </div>
   <div v-else>
     <p>쓰레드를 불러오는 중입니다...</p>
@@ -102,6 +105,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Modal from '@/components/Modal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
+import CommentSection from '@/components/comment/CommentSection.vue'
 import { QuillEditor } from '@vueup/vue-quill'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
 import { useThreads } from '@/composables/useThreads'
