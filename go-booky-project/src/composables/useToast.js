@@ -1,43 +1,55 @@
-import { ref, createApp } from 'vue'
-import Toast from '@/components/ui/Toast.vue'
-import { getKoreanErrorMessage } from '@/utils/errorMessages'
+import { ref } from 'vue'
 
 /**
  * 지침에 따른 Toast 관리 Composable
  * - 전역 오류 처리를 위한 Toast 시스템
  * - 4xx/5xx 오류 카테고리화
  * - 일관된 UX 제공
+ * - 단순한 상태 관리 (Vue 베스트 프랙티스 준수)
  */
 
-// 전역 Toast 컨테이너
+// 전역 Toast 컨테이너 (단일 소스-오브-트루스)
 const toasts = ref([])
+const toastTimers = new Map() // 타이머 관리용
 let toastId = 0
 
 /**
- * Toast 표시 함수
- * @param {Object} options Toast 옵션
+ * Toast 추가 함수
+ * @param {string} message 메시지
+ * @param {string} type 타입 (success, error, info, warning)
+ * @param {number} duration 지속 시간 (ms)
+ * @returns {number} Toast ID
  */
-const showToast = (options) => {
+const addToast = (message, type = 'info', duration = 4000) => {
   const id = ++toastId
   const toast = {
     id,
-    ...options,
+    message,
+    type,
     visible: true,
+  }
+
+  // UX 개선: 최대 토스트 개수 제한 (3개)
+  const MAX_TOASTS = 3
+  if (toasts.value.length >= MAX_TOASTS) {
+    // 가장 오래된 토스트 제거
+    const oldestToast = toasts.value[0]
+    removeToast(oldestToast.id)
   }
 
   toasts.value.push(toast)
 
-  // DOM에 Toast 컴포넌트 마운트
-  const container = document.createElement('div')
-  container.id = `toast-${id}`
-  document.body.appendChild(container)
+  // 자동으로 제거 (UX 베스트 프랙티스: 4초)
+  const timerId = setTimeout(() => {
+    removeToast(id)
+  }, duration)
 
-  const app = createApp(Toast, {
-    ...options,
-    onClose: () => removeToast(id),
+  // 타이머 저장 (호버 시 일시정지용)
+  toastTimers.set(id, {
+    timerId,
+    remainingTime: duration,
+    startTime: Date.now(),
   })
-
-  app.mount(container)
 
   return id
 }
@@ -52,10 +64,11 @@ const removeToast = (id) => {
     toasts.value.splice(index, 1)
   }
 
-  // DOM에서 제거
-  const container = document.getElementById(`toast-${id}`)
-  if (container) {
-    container.remove()
+  // 타이머 정리
+  const timer = toastTimers.get(id)
+  if (timer) {
+    clearTimeout(timer.timerId)
+    toastTimers.delete(id)
   }
 }
 
@@ -63,177 +76,61 @@ const removeToast = (id) => {
  * 모든 Toast 제거
  */
 const clearAllToasts = () => {
-  toasts.value.forEach((toast) => {
-    const container = document.getElementById(`toast-${toast.id}`)
-    if (container) {
-      container.remove()
-    }
+  // 모든 타이머 정리
+  toastTimers.forEach((timer) => {
+    clearTimeout(timer.timerId)
   })
+  toastTimers.clear()
   toasts.value = []
 }
 
 /**
- * useToast Composable
+ * Toast 일시정지 (호버 시)
+ * @param {number} id Toast ID
+ */
+const pauseToast = (id) => {
+  const timer = toastTimers.get(id)
+  if (timer) {
+    clearTimeout(timer.timerId)
+    const elapsed = Date.now() - timer.startTime
+    timer.remainingTime = Math.max(0, timer.remainingTime - elapsed)
+  }
+}
+
+/**
+ * Toast 재개 (호버 해제 시)
+ * @param {number} id Toast ID
+ */
+const resumeToast = (id) => {
+  const timer = toastTimers.get(id)
+  if (timer && timer.remainingTime > 0) {
+    timer.startTime = Date.now()
+    timer.timerId = setTimeout(() => {
+      removeToast(id)
+    }, timer.remainingTime)
+  }
+}
+
+/**
+ * useToast Composable (싱글톤 패턴)
  */
 export function useToast() {
-  /**
-   * 성공 Toast 표시
-   * @param {string} message 메시지
-   * @param {Object} options 추가 옵션
-   */
-  const success = (message, options = {}) => {
-    return showToast({
-      type: 'success',
-      message,
-      title: '성공',
-      ...options,
-    })
-  }
-
-  /**
-   * 오류 Toast 표시
-   * @param {string} message 메시지
-   * @param {Object} options 추가 옵션
-   */
-  const error = (message, options = {}) => {
-    return showToast({
-      type: 'error',
-      message,
-      title: '오류',
-      duration: 7000, // 오류는 조금 더 오래 표시
-      ...options,
-    })
-  }
-
-  /**
-   * 경고 Toast 표시
-   * @param {string} message 메시지
-   * @param {Object} options 추가 옵션
-   */
-  const warning = (message, options = {}) => {
-    return showToast({
-      type: 'warning',
-      message,
-      title: '경고',
-      ...options,
-    })
-  }
-
-  /**
-   * 정보 Toast 표시
-   * @param {string} message 메시지
-   * @param {Object} options 추가 옵션
-   */
-  const info = (message, options = {}) => {
-    return showToast({
-      type: 'info',
-      message,
-      title: '알림',
-      ...options,
-    })
-  }
-
-  /**
-   * API 오류를 Toast로 표시 (지침에 따른 4xx/5xx 카테고리화)
-   * @param {Object} err Axios 오류 객체
-   * @param {string} defaultMessage 기본 메시지
-   */
-  const showApiError = (err, defaultMessage = '요청 처리 중 오류가 발생했습니다.') => {
-    console.error('🚨 [useToast] API 오류:', err)
-
-    const status = err.response?.status
-    let title = '오류'
-    let type = 'error'
-    let duration = 7000
-
-    // 지침에 따른 4xx/5xx 카테고리화
-    if (status >= 400 && status < 500) {
-      // 4xx: 클라이언트 오류
-      if (status === 401) {
-        title = '인증 필요'
-        type = 'warning'
-      } else if (status === 403) {
-        title = '권한 없음'
-        type = 'warning'
-      } else if (status === 404) {
-        title = '찾을 수 없음'
-        type = 'warning'
-      } else if (status === 422) {
-        title = '입력 오류'
-        type = 'warning'
-      } else {
-        title = '요청 오류'
-        type = 'warning'
-      }
-    } else if (status >= 500) {
-      // 5xx: 서버 오류
-      title = '서버 오류'
-      type = 'error'
-      duration = 10000 // 서버 오류는 더 오래 표시
-    }
-
-    // 한국어 오류 메시지 추출
-    const message = getKoreanErrorMessage(err, defaultMessage)
-
-    return showToast({
-      type,
-      title,
-      message,
-      duration,
-      persistent: status >= 500, // 서버 오류는 수동으로 닫아야 함
-    })
-  }
-
-  /**
-   * 네트워크 오류 Toast 표시
-   * @param {Object} err 네트워크 오류
-   */
-  const showNetworkError = (err) => {
-    console.error('🌐 [useToast] 네트워크 오류:', err)
-
-    return showToast({
-      type: 'error',
-      title: '연결 오류',
-      message: '네트워크 연결을 확인해주세요.',
-      duration: 8000,
-      persistent: true,
-    })
-  }
-
-  /**
-   * 로딩 Toast 표시 (진행 상황 표시용)
-   * @param {string} message 메시지
-   * @param {Object} options 추가 옵션
-   */
-  const loading = (message, options = {}) => {
-    return showToast({
-      type: 'info',
-      title: '처리 중',
-      message,
-      persistent: true,
-      dismissible: false,
-      ...options,
-    })
-  }
+  const success = (message, duration) => addToast(message, 'success', duration)
+  const error = (message, duration) => addToast(message, 'error', duration)
+  const info = (message, duration) => addToast(message, 'info', duration)
+  const warning = (message, duration) => addToast(message, 'warning', duration)
 
   return {
-    // 기본 Toast 메서드
+    toasts,
+    addToast,
+    removeToast,
+    clearAllToasts,
+    pauseToast,
+    resumeToast,
     success,
     error,
-    warning,
     info,
-    loading,
-
-    // API 오류 전용 메서드
-    showApiError,
-    showNetworkError,
-
-    // 관리 메서드
-    remove: removeToast,
-    clear: clearAllToasts,
-
-    // 상태
-    toasts: toasts.value,
+    warning,
   }
 }
 

@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { threadsAPI } from '@/api/threads'
 import { useApi } from './useApi'
 import { useThreadStore } from '@/stores/thread'
+import { useToast } from './useToast'
 
 /**
  * 지침에 따른 쓰레드 Composable
@@ -13,6 +14,7 @@ import { useThreadStore } from '@/stores/thread'
 export function useThreads() {
   const { execute, isLoading, error, clearError, reset } = useApi()
   const threadStore = useThreadStore()
+  const { error: showErrorToast } = useToast()
 
   // 스토어에서 상태 가져오기
   const threads = computed(() => threadStore.threads)
@@ -141,16 +143,44 @@ export function useThreads() {
   }
 
   /**
-   * 쓰레드 좋아요/좋아요 취소
+   * 쓰레드 좋아요/좋아요 취소 (Optimistic UI)
    * @param {number} threadId 쓰레드 ID
    * @returns {Promise} 좋아요 상태
    */
   const toggleLike = async (threadId) => {
+    // 현재 쓰레드 상태 가져오기
+    const currentThread = threads.value.find((t) => t.id === threadId) || selectedThread.value
+    if (!currentThread) {
+      console.error('❌ [useThreads] 쓰레드를 찾을 수 없음:', threadId)
+      return
+    }
+
+    // 원본 상태 저장 (롤백용)
+    const originalLiked = currentThread.liked
+    const originalCount = currentThread.likes_count
+
+    // 1. Optimistic UI 업데이트 (즉시 반영)
+    const optimisticLiked = !originalLiked
+    const optimisticCount = originalCount + (optimisticLiked ? 1 : -1)
+
+    console.log('🚀 [useThreads] Optimistic UI 업데이트:', {
+      threadId,
+      from: { liked: originalLiked, count: originalCount },
+      to: { liked: optimisticLiked, count: optimisticCount },
+    })
+
+    // 즉시 UI 업데이트
+    threadStore.updateThreadLike(threadId, optimisticLiked, optimisticCount)
+
     try {
+      // 2. 백그라운드에서 API 호출
       const response = await execute(() => threadsAPI.toggleLike(threadId))
 
-      // 스토어에서 좋아요 상태 업데이트
-      threadStore.updateThreadLike(threadId, response.liked, response.likes_count)
+      // 3. 서버 응답과 다르면 수정 (보통은 같음)
+      if (response.liked !== optimisticLiked || response.likes_count !== optimisticCount) {
+        console.log('🔄 [useThreads] 서버 응답으로 상태 수정:', response)
+        threadStore.updateThreadLike(threadId, response.liked, response.likes_count)
+      }
 
       console.log('✅ [useThreads] 좋아요 토글 성공:', {
         threadId,
@@ -160,8 +190,26 @@ export function useThreads() {
 
       return response
     } catch (err) {
-      console.error('❌ [useThreads] 좋아요 토글 실패:', err)
-      throw err
+      // 4. 실패 시 원래 상태로 롤백
+      console.error('❌ [useThreads] 좋아요 토글 실패 - 롤백:', err)
+      threadStore.updateThreadLike(threadId, originalLiked, originalCount)
+
+      // 세분화된 에러 처리 (지침 준수: "4xx/5xx 오류 카테고리화")
+      let errorMessage = '좋아요 처리에 실패했습니다.'
+
+      if (err.response?.status === 401) {
+        errorMessage = '로그인이 필요합니다.'
+      } else if (err.response?.status === 403) {
+        errorMessage = '권한이 없습니다.'
+      } else if (err.response?.status >= 500) {
+        errorMessage = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+      } else if (err.code === 'NETWORK_ERROR') {
+        errorMessage = '네트워크 연결을 확인해주세요.'
+      }
+
+      // 사용자에게 토스트 알림
+      showErrorToast(errorMessage)
+      throw new Error(errorMessage)
     }
   }
 

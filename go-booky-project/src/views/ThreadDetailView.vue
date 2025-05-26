@@ -24,10 +24,21 @@
     <div class="content" v-html="thread.content"></div>
 
     <div class="actions">
-      <button @click="handleLikeThread">
-        <span v-if="isLiked">❤️</span>
-        <span v-else>🤍</span>
-        {{ likesCount }}
+      <button
+        @click="handleLikeThread"
+        class="like-button"
+        :class="{ liked: isLiked, animate: isAnimating(route.params.id) }"
+        :aria-label="isLiked ? '좋아요 취소' : '좋아요'"
+        :aria-pressed="isLiked"
+        type="button"
+      >
+        <Transition name="heart" mode="out-in">
+          <span v-if="isLiked" key="filled" class="heart-icon filled" aria-hidden="true">❤️</span>
+          <span v-else key="empty" class="heart-icon empty" aria-hidden="true">🤍</span>
+        </Transition>
+        <Transition name="count" mode="out-in">
+          <span :key="likesCount" class="like-count">{{ likesCount }}</span>
+        </Transition>
       </button>
       <button @click="showEditModal = true" class="edit-btn">수정</button>
       <button @click="showDeleteModal = true" class="delete-btn">삭제</button>
@@ -95,6 +106,8 @@ import { QuillEditor } from '@vueup/vue-quill'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
 import { useThreads } from '@/composables/useThreads'
 import { useValidation, combinedSchemas } from '@/composables/useValidation'
+import { useToast } from '@/composables/useToast'
+import { useAnimation } from '@/composables/useAnimation'
 
 const route = useRoute()
 const router = useRouter()
@@ -109,6 +122,8 @@ const {
   isLoading,
 } = useThreads()
 const { validate, clearErrors } = useValidation(combinedSchemas.threadUpdate)
+const { error: showErrorToast } = useToast()
+const { startAnimation, isAnimating } = useAnimation()
 
 const thread = computed(() => selectedThread.value)
 const showEditModal = ref(false)
@@ -254,10 +269,17 @@ const confirmDelete = async () => {
 const handleLikeThread = async () => {
   try {
     const threadId = route.params.id
+
+    // 애니메이션 시작 (지침 준수: "비즈니스 로직은 훅으로")
+    startAnimation(threadId)
+
     await toggleLike(threadId)
     console.log('✅ [ThreadDetailView] 좋아요 토글 성공')
   } catch (error) {
     console.error('❌ [ThreadDetailView] 좋아요 처리 실패:', error)
+
+    // 사용자에게 에러 알림 (지침 준수: "일관된 UX")
+    showErrorToast(error.message || '좋아요 처리에 실패했습니다.')
   }
 }
 
@@ -373,9 +395,111 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.like-btn {
-  background-color: #3498db;
-  color: white;
+/* 좋아요 버튼 스타일 */
+.like-button {
+  background-color: #f8f9fa;
+  border: 2px solid #dee2e6;
+  color: #495057;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.like-button:hover {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+  transform: translateY(-1px);
+}
+
+.like-button.liked {
+  background-color: #fff5f5;
+  border-color: #fc8181;
+  color: #e53e3e;
+}
+
+.like-button.liked:hover {
+  background-color: #fed7d7;
+  border-color: #f56565;
+}
+
+/* 클릭 애니메이션 */
+.like-button.animate {
+  animation: heartBeat 0.6s ease-in-out;
+}
+
+@keyframes heartBeat {
+  0% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.3);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.2);
+  }
+  70% {
+    transform: scale(1);
+  }
+}
+
+/* 하트 아이콘 애니메이션 */
+.heart-icon {
+  font-size: 20px;
+  display: inline-block;
+}
+
+.heart-enter-active,
+.heart-leave-active {
+  transition: all 0.3s ease;
+}
+
+.heart-enter-from {
+  opacity: 0;
+  transform: scale(0) rotate(180deg);
+}
+
+.heart-leave-to {
+  opacity: 0;
+  transform: scale(0) rotate(-180deg);
+}
+
+.heart-enter-to,
+.heart-leave-from {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+/* 좋아요 수 애니메이션 */
+.like-count {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.count-enter-active,
+.count-leave-active {
+  transition: all 0.2s ease;
+}
+
+.count-enter-from {
+  opacity: 0;
+  transform: translateY(-10px) scale(1.2);
+}
+
+.count-leave-to {
+  opacity: 0;
+  transform: translateY(10px) scale(0.8);
+}
+
+.count-enter-to,
+.count-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .edit-btn {
