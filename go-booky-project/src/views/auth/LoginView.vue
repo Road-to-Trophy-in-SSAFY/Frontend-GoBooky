@@ -51,29 +51,49 @@
         </button>
         <span v-if="errors.password" class="error">{{ errors.password }}</span>
       </div>
-      <button type="submit" class="submit-button">로그인</button>
+      <button type="submit" class="submit-button" :disabled="isLoggingIn">
+        <span v-if="isLoggingIn" class="login-loader">
+          <div class="spinner"></div>
+          로그인 중...
+        </span>
+        <span v-else>로그인</span>
+      </button>
       <div class="back-link">
         <RouterLink to="/">&leftarrow; 시작 페이지로</RouterLink>
       </div>
     </form>
+
+    <!-- 로그인 성공 시 전체 화면 로더 -->
+    <div v-if="showSuccessLoader" class="success-loader-overlay">
+      <div class="success-loader-content">
+        <div class="success-icon">✓</div>
+        <h3>로그인 성공!</h3>
+        <div class="loading-spinner"></div>
+        <p>홈페이지로 이동 중...</p>
+      </div>
+    </div>
+
+    <!-- 에러 모달은 유지 -->
     <Modal v-if="modalText" :text="modalText" @close="modalText = ''" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useAuth } from '@/composables/useAuth'
 import { useRouter } from 'vue-router'
 import SanitizedInput from '@/components/common/SanitizedInput.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { useValidation, combinedSchemas } from '@/composables/useValidation'
 
-const { login } = useAuth()
+const { login, isLoading } = useAuth()
 const router = useRouter()
 const email = ref('')
 const password = ref('')
 const modalText = ref('')
 const showPassword = ref(false)
+const showSuccessLoader = ref(false)
+const isLoggingIn = computed(() => isLoading.value)
 
 // 지침에 따른 검증 시스템 사용
 const { errors, validate, clearErrors } = useValidation(combinedSchemas.login)
@@ -110,12 +130,13 @@ const handleSubmit = async () => {
   const success = await login(email.value, password.value)
 
   if (success) {
-    // 로그인 성공 시 성공 메시지 표시
-    modalText.value = '로그인 성공!'
+    // 로그인 성공 시 로더 표시
+    showSuccessLoader.value = true
+    password.value = '' // 로그인 성공 후 비밀번호 초기화
+
     setTimeout(() => {
       router.push('/') // 홈페이지로 리다이렉트
-    }, 500)
-    password.value = '' // 로그인 성공 후 비밀번호 초기화
+    }, 1500) // 1.5초 후 이동
   } else {
     // 로그인 실패 시 에러 메시지 표시 (항상 한국어로 통일)
     modalText.value = '이메일 혹은 비밀번호를 잘못 입력하였습니다. 다시 시도해주세요.'
@@ -259,6 +280,120 @@ const handleSubmit = async () => {
   text-decoration: none;
 }
 
+/* 로그인 버튼 로더 */
+.login-loader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* 로그인 성공 전체 화면 로더 */
+.success-loader-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(5px);
+}
+
+.success-loader-content {
+  text-align: center;
+  padding: 2rem;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  max-width: 300px;
+  width: 90%;
+}
+
+.success-icon {
+  width: 60px;
+  height: 60px;
+  background: #42b983;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 0 auto 1rem;
+  animation: successPulse 0.6s ease-out;
+}
+
+.success-loader-content h3 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+}
+
+.success-loader-content p {
+  color: #64748b;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #42b983;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+.submit-button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.submit-button:disabled:hover {
+  background: #94a3b8;
+  transform: none;
+  box-shadow: none;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes successPulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 @media (max-width: 480px) {
   .login-form {
     padding: 2rem 1.5rem;
@@ -271,6 +406,17 @@ const handleSubmit = async () => {
 
   .form-input {
     padding: 0.75rem;
+  }
+
+  .success-loader-content {
+    padding: 1.5rem;
+    max-width: 280px;
+  }
+
+  .success-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
   }
 }
 </style>
