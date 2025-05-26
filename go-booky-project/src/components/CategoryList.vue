@@ -36,6 +36,7 @@ import { useCategoryStore } from '@/stores/category.js'
 import { computed } from 'vue'
 import { useBookStore } from '@/stores/books.js'
 import { useBooks } from '@/composables/useBooks'
+import { useRouter, useRoute } from 'vue-router'
 
 defineOptions({
   name: 'CategoryList',
@@ -45,6 +46,8 @@ const categoryStore = useCategoryStore()
 const categories = computed(() => categoryStore.categories)
 const bookStore = useBookStore()
 const { fetchBooksByCategory, fetchBooks } = useBooks()
+const router = useRouter()
+const route = useRoute()
 
 // 카테고리별 아이콘 매핑
 const getCategoryIcon = (categoryName) => {
@@ -69,33 +72,37 @@ const getCategoryIcon = (categoryName) => {
 
 async function selectCategory(pk) {
   try {
-    const isSearchMode = bookStore.filters.search && bookStore.filters.search.trim() !== ''
+    console.log('📂 [CategoryList] 카테고리 선택:', pk)
 
-    if (isSearchMode) {
-      // 검색 모드일 때는 검색어를 유지하고 카테고리 필터만 변경
-      console.log('🔍 [CategoryList] 검색 모드에서 카테고리 필터링:', pk)
-      bookStore.setFilters({
-        search: bookStore.filters.search, // 검색어 유지
-        category: pk,
-      })
+    // 스토어에 필터 설정
+    bookStore.setFilters({
+      category: pk,
+      search: bookStore.filters.search, // 검색어는 유지
+    })
+
+    // URL 업데이트 (페이지를 1로 리셋)
+    const newQuery = { ...route.query }
+
+    if (pk === null) {
+      // 전체 카테고리 선택 시 category 파라미터 제거
+      delete newQuery.category
     } else {
-      // 일반 모드일 때는 기존 로직 유지
-      if (pk === null) {
-        // 전체 카테고리 선택 시 모든 도서 조회
-        console.log('📚 [CategoryList] 전체 도서 조회')
-        const response = await fetchBooks()
-        bookStore.setBooks(response.results || response)
-        bookStore.setFilters({ category: null, search: '' })
-      } else {
-        // 특정 카테고리 선택 시 해당 카테고리 도서 조회
-        console.log('📂 [CategoryList] 카테고리별 도서 조회:', pk)
-        const response = await fetchBooksByCategory(pk)
-        bookStore.setBooks(response.results || response)
-        bookStore.setFilters({ category: pk, search: '' })
-      }
+      // 특정 카테고리 선택 시 category 파라미터 설정
+      newQuery.category = pk
     }
 
-    console.log('✅ [CategoryList] 카테고리 선택 완료')
+    // 페이지를 1로 리셋
+    newQuery.page = '1'
+
+    // 라우터로 URL 업데이트 (이렇게 하면 BookListView의 watch가 트리거됨)
+    await router.push({
+      query: newQuery,
+    })
+
+    console.log('✅ [CategoryList] 카테고리 선택 및 URL 업데이트 완료:', {
+      category: pk,
+      newQuery,
+    })
   } catch (error) {
     console.error('❌ [CategoryList] 카테고리 선택 실패:', error)
   }

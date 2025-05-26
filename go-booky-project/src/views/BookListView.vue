@@ -83,12 +83,6 @@
                 </span>
               </button>
             </nav>
-
-            <!-- 페이지 정보 -->
-            <div class="pagination-info">
-              {{ pagination.page }} / {{ pagination.totalPages }} 페이지 (총
-              {{ pagination.totalCount }}권)
-            </div>
           </div>
         </div>
 
@@ -168,9 +162,27 @@ const loadBooks = async (page = 1) => {
     loading.value = true
     error.value = null
 
-    console.log('📚 [BookListView] 도서 목록 로드 시작:', { page })
+    console.log('📚 [BookListView] 도서 목록 로드 시작:', {
+      page,
+      currentCategory: bookStore.filters.category,
+      currentSearch: bookStore.filters.search,
+    })
 
-    const response = await fetchBooks({ page })
+    // 현재 필터 상태에 따라 적절한 API 호출
+    let response
+    const params = { page }
+
+    // 카테고리 필터가 있는 경우
+    if (bookStore.filters.category) {
+      params.category = bookStore.filters.category
+    }
+
+    // 검색어가 있는 경우
+    if (bookStore.filters.search) {
+      params.search = bookStore.filters.search
+    }
+
+    response = await fetchBooks(params)
 
     // 응답 구조 확인 및 처리
     if (response.results) {
@@ -193,6 +205,7 @@ const loadBooks = async (page = 1) => {
     console.log('✅ [BookListView] 도서 목록 로드 완료:', {
       count: books.value.length,
       pagination: pagination.value,
+      appliedFilters: { category: bookStore.filters.category, search: bookStore.filters.search },
     })
 
     // 현재 페이지 이미지 프리로드
@@ -248,9 +261,24 @@ const goToPage = async (page) => {
 
 // URL 쿼리 파라미터 변경 감지
 watch(
-  currentPage,
-  (newPage) => {
-    if (newPage !== pagination.value.page) {
+  () => route.query,
+  (newQuery, oldQuery) => {
+    const newPage = parseInt(newQuery.page) || 1
+    const newCategory = newQuery.category ? parseInt(newQuery.category) : null
+
+    // 스토어의 카테고리 필터 업데이트
+    if (newCategory !== bookStore.filters.category) {
+      bookStore.setFilters({
+        category: newCategory,
+        search: bookStore.filters.search, // 검색어는 유지
+      })
+    }
+
+    // 페이지가 변경되었거나 카테고리가 변경된 경우 데이터 로드
+    if (
+      newPage !== pagination.value.page ||
+      newCategory !== (oldQuery?.category ? parseInt(oldQuery.category) : null)
+    ) {
       loadBooks(newPage)
     }
   },
@@ -259,6 +287,15 @@ watch(
 
 // 컴포넌트 마운트 시 초기 로드
 onMounted(() => {
+  // URL에서 카테고리 파라미터 읽어서 스토어에 설정
+  const categoryFromUrl = route.query.category ? parseInt(route.query.category) : null
+  if (categoryFromUrl !== bookStore.filters.category) {
+    bookStore.setFilters({
+      category: categoryFromUrl,
+      search: bookStore.filters.search, // 검색어는 유지
+    })
+  }
+
   loadBooks(currentPage.value)
 })
 </script>
