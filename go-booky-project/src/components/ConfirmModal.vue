@@ -21,7 +21,7 @@
 <script setup>
 import Modal from './Modal.vue'
 
-const props = defineProps({
+defineProps({
   modelValue: {
     type: Boolean,
     required: true,

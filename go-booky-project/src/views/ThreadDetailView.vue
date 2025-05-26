@@ -5,7 +5,17 @@
 
     <!-- 쓰레드 이미지 표시 -->
     <div class="thread-image">
-      <img :src="threadImage" alt="쓰레드 이미지" class="cover-image" />
+      <img
+        v-if="threadImage !== '/logo.png'"
+        :src="threadImage"
+        alt="쓰레드 이미지"
+        class="cover-image"
+        @error="handleImageError"
+      />
+      <div v-else class="image-placeholder">
+        <div class="loading-spinner"></div>
+        <p>이미지 생성 중...</p>
+      </div>
     </div>
 
     <p>책: {{ thread.book.title }}</p>
@@ -14,8 +24,10 @@
     <div class="content" v-html="thread.content"></div>
 
     <div class="actions">
-      <button @click="likeThread" class="like-btn">
-        {{ isLiked ? '좋아요 취소' : '좋아요' }} ({{ likesCount }})
+      <button @click="handleLikeThread">
+        <span v-if="isLiked">❤️</span>
+        <span v-else>🤍</span>
+        {{ likesCount }}
       </button>
       <button @click="showEditModal = true" class="edit-btn">수정</button>
       <button @click="showDeleteModal = true" class="delete-btn">삭제</button>
@@ -52,7 +64,7 @@
       <template #footer>
         <div class="modal-actions">
           <button @click="showEditModal = false" :disabled="isLoading">취소</button>
-          <button @click="updateThread" :disabled="isLoading" class="save-btn">
+          <button @click="handleUpdateThread" :disabled="isLoading" class="save-btn">
             {{ isLoading ? '저장 중...' : '저장' }}
           </button>
         </div>
@@ -76,45 +88,68 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useThreadStore } from '@/stores/thread'
 import { useRoute, useRouter } from 'vue-router'
 import Modal from '@/components/Modal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 import { QuillEditor } from '@vueup/vue-quill'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
+import { useThreads } from '@/composables/useThreads'
+import { useValidation, combinedSchemas } from '@/composables/useValidation'
 
-const threadStore = useThreadStore()
 const route = useRoute()
 const router = useRouter()
-const thread = ref(null)
+
+// 지침에 따른 Composables 사용
+const {
+  selectedThread,
+  fetchThread,
+  updateThread: updateThreadAPI,
+  deleteThread: deleteThreadAPI,
+  toggleLike,
+  isLoading,
+} = useThreads()
+const { validate, clearErrors } = useValidation(combinedSchemas.threadUpdate)
+
+const thread = computed(() => selectedThread.value)
 const showEditModal = ref(false)
 const showDeleteModal = ref(false)
-const isLiked = ref(false)
-const likesCount = ref(0)
-const isLoading = ref(false)
+const isLiked = computed(() => thread.value?.liked || false)
+const likesCount = computed(() => thread.value?.likes_count || 0)
 const editForm = ref({
   title: '',
   content: '',
   reading_date: '',
+  book: null,
 })
 
-// 기본 이미지 URL
-const defaultImageUrl = '/default_thread_image.jpg'
+// API URL
 const API_URL = 'http://127.0.0.1:8000'
 
 // 쓰레드 이미지 계산
 const threadImage = computed(() => {
-  if (thread.value && thread.value.cover_img_url) {
-    return thread.value.cover_img_url
-  }
-  if (thread.value && thread.value.cover_img) {
-    // 절대 경로인지 확인
-    if (thread.value.cover_img.startsWith('http')) {
-      return thread.value.cover_img
+  if (thread.value) {
+    // 1. cover_img_url이 있으면 우선 사용 (백엔드에서 제공하는 완전한 URL)
+    if (thread.value.cover_img_url) {
+      console.log('🖼️ [ThreadDetailView] cover_img_url 사용:', thread.value.cover_img_url)
+      return thread.value.cover_img_url
     }
-    return `${API_URL}/media/${thread.value.cover_img}`
+
+    // 2. cover_img 필드가 있으면 사용
+    if (thread.value.cover_img) {
+      // 절대 경로인지 확인
+      if (thread.value.cover_img.startsWith('http')) {
+        console.log('🖼️ [ThreadDetailView] 절대 경로 cover_img 사용:', thread.value.cover_img)
+        return thread.value.cover_img
+      }
+      // 상대 경로면 API URL과 결합
+      const imageUrl = `${API_URL}/media/${thread.value.cover_img}`
+      console.log('🖼️ [ThreadDetailView] 상대 경로 cover_img 사용:', imageUrl)
+      return imageUrl
+    }
   }
+
   // 기본 이미지 사용
+  console.log('🖼️ [ThreadDetailView] 기본 이미지 사용')
   return '/logo.png'
 })
 
@@ -131,20 +166,30 @@ const editorOptions = {
   placeholder: '내용을 입력하세요',
 }
 
-onMounted(async () => {
-  await loadThread()
-})
-
 const loadThread = async () => {
-  await threadStore.getThreadDetail(route.params.id)
-  thread.value = threadStore.threadDetail
+  try {
+    const threadId = route.params.id
 
-  if (thread.value) {
-    editForm.value = {
-      title: thread.value.title,
-      content: thread.value.content,
-      reading_date: thread.value.reading_date,
+    // ID가 유효한지 확인
+    if (!threadId || threadId === 'undefined') {
+      console.error('유효하지 않은 쓰레드 ID:', threadId)
+      router.push({ name: 'threads' })
+      return
     }
+
+    // 지침에 따른 Composable 사용
+    await fetchThread(threadId)
+
+    if (thread.value) {
+      editForm.value = {
+        title: thread.value.title,
+        content: thread.value.content,
+        reading_date: thread.value.reading_date,
+        book: thread.value.book?.id || null,
+      }
+    }
+  } catch (error) {
+    console.error('쓰레드 데이터 로드 실패:', error)
   }
 }
 
@@ -154,39 +199,110 @@ const formatDate = (dateString) => {
   return date.toLocaleDateString()
 }
 
-const updateThread = async () => {
+const handleUpdateThread = async () => {
   try {
-    isLoading.value = true
-    await threadStore.updateThread(route.params.id, editForm.value)
-    await loadThread()
-    isLoading.value = false
+    clearErrors()
+
+    // 수정용 검증 (book 필드 제외)
+    const updateData = {
+      title: editForm.value.title,
+      content: editForm.value.content,
+      reading_date: editForm.value.reading_date,
+    }
+
+    const isValid = await validate(updateData)
+    if (!isValid) {
+      console.log('❌ [ThreadDetailView] 폼 검증 실패')
+      return
+    }
+
+    const threadId = route.params.id
+    await updateThreadAPI(threadId, editForm.value)
+
+    // 수정 완료 후 최신 데이터 다시 불러오기
+    await fetchThread(threadId)
+
+    // editForm도 최신 데이터로 업데이트
+    if (thread.value) {
+      editForm.value = {
+        title: thread.value.title,
+        content: thread.value.content,
+        reading_date: thread.value.reading_date,
+        book: thread.value.book?.id || null,
+      }
+    }
+
     showEditModal.value = false
+    console.log('✅ [ThreadDetailView] 쓰레드 수정 성공')
   } catch (error) {
-    isLoading.value = false
-    console.error('쓰레드 수정 실패:', error)
+    console.error('❌ [ThreadDetailView] 쓰레드 수정 실패:', error)
     alert('쓰레드 수정에 실패했습니다.')
   }
 }
 
 const confirmDelete = async () => {
   try {
-    await threadStore.deleteThread(route.params.id)
+    const threadId = route.params.id
+    await deleteThreadAPI(threadId)
     router.push({ name: 'threads' })
+    console.log('✅ [ThreadDetailView] 쓰레드 삭제 성공')
   } catch (error) {
-    console.error('쓰레드 삭제 실패:', error)
-    alert('쓰레드 삭제에 실패했습니다.')
+    console.error('❌ [ThreadDetailView] 쓰레드 삭제 실패:', error)
   }
 }
 
-const likeThread = async () => {
+const handleLikeThread = async () => {
   try {
-    const response = await threadStore.likeThread(route.params.id)
-    isLiked.value = response.liked
-    likesCount.value = response.likes_count
+    const threadId = route.params.id
+    await toggleLike(threadId)
+    console.log('✅ [ThreadDetailView] 좋아요 토글 성공')
   } catch (error) {
-    console.error('좋아요 처리 실패:', error)
+    console.error('❌ [ThreadDetailView] 좋아요 처리 실패:', error)
   }
 }
+
+const handleImageError = () => {
+  console.log('🖼️ [ThreadDetailView] 이미지 로드 실패 - 기본 이미지 사용')
+}
+
+// 이미지가 없는 경우 주기적으로 쓰레드 정보 새로고침
+let imageCheckInterval = null
+
+onMounted(async () => {
+  // 컴포넌트 마운트 시 ID 유효성 검사
+  const threadId = route.params.id
+  if (!threadId || threadId === 'undefined') {
+    console.error('유효하지 않은 쓰레드 ID:', threadId)
+    router.push({ name: 'threads' }) // 유효하지 않은 ID인 경우 목록 페이지로 리다이렉트
+    return
+  }
+
+  await loadThread()
+
+  // 이미지가 없으면 주기적으로 확인
+  if (!thread.value?.cover_img_url && !thread.value?.cover_img) {
+    console.log('🔄 [ThreadDetailView] 이미지 생성 대기 중 - 주기적 확인 시작')
+    imageCheckInterval = setInterval(async () => {
+      try {
+        await fetchThread(threadId)
+        if (thread.value?.cover_img_url || thread.value?.cover_img) {
+          console.log('✅ [ThreadDetailView] 이미지 생성 완료 - 주기적 확인 중단')
+          clearInterval(imageCheckInterval)
+        }
+      } catch (error) {
+        console.error('❌ [ThreadDetailView] 이미지 확인 실패:', error)
+      }
+    }, 3000) // 3초마다 확인
+  }
+})
+
+// 컴포넌트 언마운트 시 인터벌 정리
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  if (imageCheckInterval) {
+    clearInterval(imageCheckInterval)
+  }
+})
 </script>
 
 <style scoped>
@@ -206,6 +322,36 @@ const likeThread = async () => {
   max-height: 400px;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 2px dashed #dee2e6;
+}
+
+.loading-spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4caf50;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 2s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .content {

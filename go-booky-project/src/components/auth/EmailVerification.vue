@@ -13,7 +13,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import Modal from '../ui/Modal.vue'
-import axios from '@/services/axios'
+import api from '@/api'
 
 const resendDisabled = ref(false)
 const resendTimer = ref(60)
@@ -31,8 +31,14 @@ onMounted(async () => {
   const uuid = route.params.uuid
   if (uuid) {
     try {
-      const res = await axios.get(`/auth/verify-email/${uuid}/`)
-      message.value = res.data.detail
+      const res = await api.get(`/auth/auth/verify-email/${uuid}/`)
+      if (res.status === 200) {
+        modalText.value = res.data.detail || '이메일 인증이 완료되었습니다. 다음을 진행해주세요.'
+        message.value = ''
+      } else {
+        message.value = res.data?.detail || '이메일 인증 중 오류가 발생했습니다.'
+        modalText.value = ''
+      }
     } catch (err) {
       handleError(err)
     }
@@ -47,7 +53,7 @@ const resendEmail = async () => {
       modalText.value = '이메일 정보가 없습니다. 회원가입을 다시 진행해 주세요.'
       return
     }
-    await axios.post('/auth/resend-email/', { email })
+    await api.post('/auth/auth/resend-email/', { email })
     modalText.value = '인증 메일이 재전송되었습니다.'
     startResendTimer()
   } catch (err) {

@@ -1,174 +1,208 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import axios from 'axios'
 import { categoriesData } from './categoriesData.js'
 
-export const useBookStore = defineStore('book', () => {
-  const books = ref([]) // 현재 API에서 받아온 모든 책 목록
-  const filteredBooks = ref([]) // 화면에 표시될 필터링된 책 목록
-  const searchResults = ref([]) // 검색 결과를 별도로 저장
-  const isLoading = ref(false)
-  const API_URL = 'http://127.0.0.1:8000'
-  const currentSearchQuery = ref('') // 현재 검색어 저장
-  const currentCategory = ref(null) // 현재 카테고리 저장
-  const hasSearchResults = ref(false) // 검색 결과가 있는지 여부
-
-  // 카테고리별로 서버에서 필터링된 책 목록을 받아오는 함수
-  const getBooks = function (categoryPk = null) {
-    isLoading.value = true
-    currentCategory.value = categoryPk
-    currentSearchQuery.value = '' // 검색어 초기화
-    hasSearchResults.value = false // 검색 결과 상태 초기화
-
-    let url = `${API_URL}/books/`
-    if (categoryPk) {
-      url += `?category=${categoryPk}`
-    }
-    axios({
-      method: 'get',
-      url,
+/**
+ * 지침에 따른 단순화된 도서 스토어
+ * - 상태 관리만 담당
+ * - 비즈니스 로직은 useBooks composable로 분리
+ * - 캐시 및 필터링 관리
+ */
+export const useBookStore = defineStore(
+  'book',
+  () => {
+    // === State ===
+    const books = ref([])
+    const bookDetail = ref(null)
+    const categories = ref(categoriesData)
+    const filters = ref({
+      category: null,
+      search: '',
+      sortBy: 'title',
+      sortOrder: 'asc',
     })
-      .then((res) => {
-        books.value = res.data
-        filteredBooks.value = res.data
-        searchResults.value = [] // 검색 결과 초기화
-      })
-      .catch((err) => {
-        console.log(err)
-      })
-      .finally(() => {
-        isLoading.value = false
-      })
-  }
-
-  // 검색 함수
-  const searchBooks = function (query, searchInAllCategories = true) {
-    if (!query) {
-      getBooks(currentCategory.value)
-      return
-    }
-
-    isLoading.value = true
-    currentSearchQuery.value = query // 현재 검색어 저장
-
-    // 전체 카테고리에서 검색 (기본 동작)
-    const savedCategory = currentCategory.value // 현재 카테고리 저장
-    currentCategory.value = null // 검색 시 카테고리 필터 초기화
-
-    axios({
-      method: 'get',
-      url: `${API_URL}/books/search/`,
-      params: { q: query },
+    const pagination = ref({
+      page: 1,
+      totalPages: 1,
+      totalCount: 0,
+      hasNext: false,
+      hasPrevious: false,
     })
-      .then((res) => {
-        books.value = res.data
-        searchResults.value = res.data // 검색 결과 저장
-        filteredBooks.value = res.data // 모든 검색 결과 표시 (카테고리 필터 적용 안함)
-        hasSearchResults.value = true // 검색 결과 있음으로 설정
 
-        // searchInAllCategories가 false이고 저장된 카테고리가 있는 경우에만
-        // 검색 결과에 카테고리 필터 적용
-        if (!searchInAllCategories && savedCategory) {
-          currentCategory.value = savedCategory
-          filteredBooks.value = searchResults.value.filter(
-            (book) =>
-              book.category_name && getCategoryPkByName(book.category_name) === savedCategory,
-          )
+    // === Getters ===
+    const hasBooks = computed(() => books.value.length > 0)
+
+    const getBookById = computed(() => {
+      return (id) => books.value.find((book) => book.id === parseInt(id))
+    })
+
+    const filteredBooks = computed(() => {
+      let result = books.value
+
+      // 카테고리 필터
+      if (filters.value.category) {
+        result = result.filter((book) => {
+          // 직접 category_id로 비교
+          if (book.category_id) {
+            return book.category_id === filters.value.category
+          }
+          // category_name으로 비교 (레거시 지원)
+          if (book.category_name) {
+            return getCategoryPkByName(book.category_name) === filters.value.category
+          }
+          return false
+        })
+      }
+
+      // 검색 필터 (title, author, description에서 검색)
+      if (filters.value.search) {
+        const searchTerm = filters.value.search.toLowerCase()
+        result = result.filter(
+          (book) =>
+            book.title?.toLowerCase().includes(searchTerm) ||
+            book.author?.toLowerCase().includes(searchTerm) ||
+            book.description?.toLowerCase().includes(searchTerm),
+        )
+      }
+
+      // 정렬
+      result.sort((a, b) => {
+        const { sortBy, sortOrder } = filters.value
+        let aValue = a[sortBy]
+        let bValue = b[sortBy]
+
+        // 문자열 비교
+        if (typeof aValue === 'string') {
+          aValue = aValue.toLowerCase()
+          bValue = bValue.toLowerCase()
+        }
+
+        if (sortOrder === 'asc') {
+          return aValue > bValue ? 1 : -1
+        } else {
+          return aValue < bValue ? 1 : -1
         }
       })
-      .catch((err) => {
-        console.log(err)
-        // 에러 시 카테고리 상태 복원하지 않음
-      })
-      .finally(() => {
-        isLoading.value = false
-      })
-  }
 
-  // 검색 결과 내에서 카테고리 필터링
-  const filterSearchResultsByCategory = function (categoryPk) {
-    currentCategory.value = categoryPk
+      return result
+    })
 
-    if (!hasSearchResults.value) {
-      // 검색 결과가 없으면 일반 카테고리 필터링 사용
-      getBooks(categoryPk)
-      return
+    const getCategoryById = computed(() => {
+      return (id) => categories.value.find((cat) => cat.pk === id)
+    })
+
+    const getCategoryByName = computed(() => {
+      return (name) => categories.value.find((cat) => cat.fields.name === name)
+    })
+
+    // === Actions (상태 변경만) ===
+
+    /**
+     * 도서 목록 설정
+     * @param {Array} bookList 도서 목록
+     */
+    function setBooks(bookList) {
+      books.value = bookList
+      console.log('✅ [BookStore] 도서 목록 설정 완료:', bookList.length)
     }
 
-    // 로딩 상태 표시
-    isLoading.value = true
-
-    // 검색 결과 내에서 카테고리 필터링
-    if (!categoryPk) {
-      // 카테고리가 없으면 모든 검색 결과 표시
-      filteredBooks.value = searchResults.value
-    } else {
-      // 해당 카테고리의 검색 결과만 필터링
-      filteredBooks.value = searchResults.value.filter(
-        (book) => book.category_name && getCategoryPkByName(book.category_name) === categoryPk,
-      )
+    /**
+     * 도서 상세 설정
+     * @param {Object} book 도서 객체
+     */
+    function setBookDetail(book) {
+      bookDetail.value = book
+      console.log('✅ [BookStore] 도서 상세 설정 완료:', book?.id)
     }
 
-    // 로딩 상태 해제 (짧은 지연 후)
-    setTimeout(() => {
-      isLoading.value = false
-    }, 300)
-  }
-
-  // 검색 결과 초기화 (전체 도서 목록으로 돌아가기)
-  const clearSearchResults = function () {
-    currentSearchQuery.value = ''
-    hasSearchResults.value = false
-    searchResults.value = []
-    getBooks(currentCategory.value)
-  }
-
-  // 프론트엔드에서만 필터링 (서버 필터링이 안 될 때 사용)
-  const filterByCategory = function (categoryPk) {
-    currentCategory.value = categoryPk
-
-    if (!categoryPk) {
-      filteredBooks.value = books.value
-    } else {
-      filteredBooks.value = books.value.filter(
-        (book) => book.category_name && getCategoryPkByName(book.category_name) === categoryPk,
-      )
+    /**
+     * 카테고리 목록 설정
+     * @param {Array} categoryList 카테고리 목록
+     */
+    function setCategories(categoryList) {
+      categories.value = categoryList
+      console.log('✅ [BookStore] 카테고리 목록 설정 완료:', categoryList.length)
     }
-  }
 
-  function getCategoryPkByName(name) {
-    const category = categoriesData.find((cat) => cat.fields.name === name)
-    return category ? category.pk : null
-  }
-
-  const getBookById = function (id) {
-    return books.value.find((book) => book.id === id)
-  }
-
-  const getBookDetail = async function (id) {
-    try {
-      const res = await axios.get(`${API_URL}/books/${id}/`)
-      return res.data
-    } catch (err) {
-      console.log(err)
-      return null
+    /**
+     * 필터 설정
+     * @param {Object} filterData 필터 데이터
+     */
+    function setFilters(filterData) {
+      filters.value = { ...filters.value, ...filterData }
     }
-  }
 
-  return {
-    books,
-    filteredBooks,
-    searchResults,
-    isLoading,
-    currentSearchQuery,
-    currentCategory,
-    hasSearchResults,
-    getBooks,
-    searchBooks,
-    filterSearchResultsByCategory,
-    clearSearchResults,
-    getBookById,
-    getBookDetail,
-    filterByCategory,
-  }
-})
+    /**
+     * 페이지네이션 정보 설정
+     * @param {Object} paginationData 페이지네이션 데이터
+     */
+    function setPagination(paginationData) {
+      pagination.value = { ...pagination.value, ...paginationData }
+    }
+
+    /**
+     * 카테고리 이름으로 PK 찾기 (레거시 지원)
+     * @param {string} name 카테고리 이름
+     * @returns {number|null} 카테고리 PK
+     */
+    function getCategoryPkByName(name) {
+      const category = categories.value.find((cat) => cat.fields.name === name)
+      return category ? category.pk : null
+    }
+
+    /**
+     * 상태 초기화
+     */
+    function reset() {
+      books.value = []
+      bookDetail.value = null
+      filters.value = {
+        category: null,
+        search: '',
+        sortBy: 'title',
+        sortOrder: 'asc',
+      }
+      pagination.value = {
+        page: 1,
+        totalPages: 1,
+        totalCount: 0,
+        hasNext: false,
+        hasPrevious: false,
+      }
+      console.log('🔄 [BookStore] 상태 초기화 완료')
+    }
+
+    return {
+      // State
+      books,
+      bookDetail,
+      categories,
+      filters,
+      pagination,
+
+      // Getters
+      hasBooks,
+      getBookById,
+      filteredBooks,
+      getCategoryById,
+      getCategoryByName,
+
+      // Actions
+      setBooks,
+      setBookDetail,
+      setCategories,
+      setFilters,
+      setPagination,
+      getCategoryPkByName,
+      reset,
+    }
+  },
+  {
+    // 지침에 따른 persist 설정
+    persist: {
+      key: 'gobooky-books',
+      storage: sessionStorage, // 세션 스토리지 사용
+      paths: ['filters'], // 필터 설정만 유지
+    },
+  },
+)

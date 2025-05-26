@@ -89,20 +89,20 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useBookStore } from '@/stores/books.js'
-import { useThreadStore } from '@/stores/thread'
+import { useBooks } from '@/composables/useBooks'
+import { useThreads } from '@/composables/useThreads'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute, useRouter } from 'vue-router'
 import Modal from '@/components/Modal.vue'
 import { QuillEditor } from '@vueup/vue-quill'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
-const bookStore = useBookStore()
-const threadStore = useThreadStore()
+const { selectedBook, fetchBook } = useBooks()
+const { createThread } = useThreads()
 const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
-const book = ref(null)
+const book = computed(() => selectedBook.value)
 const showWriteModal = ref(false)
 const isLoading = ref(false)
 const today = new Date().toISOString().split('T')[0]
@@ -137,6 +137,12 @@ const editorOptions = {
 
 // 쓰레드 작성 버튼 클릭 핸들러
 const handleThreadWriteClick = () => {
+  console.log('🔍 [BookDetailView] 인증 상태 확인:', {
+    isAuthenticated: authStore.isAuthenticated,
+    hasToken: !!authStore.accessToken,
+    user: authStore.user?.email,
+  })
+
   if (!authStore.isAuthenticated) {
     alert('로그인이 필요한 서비스입니다.')
     router.push({ name: 'Login' })
@@ -147,30 +153,63 @@ const handleThreadWriteClick = () => {
 }
 
 onMounted(async () => {
-  book.value = await bookStore.getBookDetail(route.params.id)
-  if (book.value) {
-    threadForm.value.book = book.value.id
+  try {
+    await fetchBook(route.params.id)
+    if (book.value) {
+      threadForm.value.book = book.value.id
+    }
+  } catch (error) {
+    console.error('책 정보 로드 실패:', error)
   }
 })
 
 const submitThread = async () => {
   try {
+    console.log('📝 [BookDetailView] 쓰레드 작성 시작:', threadForm.value)
+    console.log('🔍 [BookDetailView] 현재 인증 상태:', {
+      isAuthenticated: authStore.isAuthenticated,
+      hasToken: !!authStore.accessToken,
+      user: authStore.user?.email,
+    })
+
     isLoading.value = true
-    await threadStore.createThread(threadForm.value)
+    const newThread = await createThread(threadForm.value)
     isLoading.value = false
     showWriteModal.value = false
 
-    // 쓰레드 작성 완료 후 쓰레드 목록 페이지로 이동
-    router.push({ name: 'threads' })
+    console.log('✅ [BookDetailView] 쓰레드 작성 성공:', newThread)
+
+    // 쓰레드 작성 완료 후 생성된 쓰레드 상세 페이지로 이동
+    if (newThread && newThread.id) {
+      router.push({ name: 'thread-detail', params: { id: newThread.id } })
+    } else {
+      // 쓰레드 ID가 없으면 목록 페이지로 이동
+      router.push({ name: 'threads' })
+    }
   } catch (error) {
     isLoading.value = false
+    console.error('❌ [BookDetailView] 쓰레드 작성 실패:', {
+      error: error,
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    })
+
     if (error.response?.status === 401) {
       alert('로그인이 만료되었습니다. 다시 로그인해주세요.')
-      authStore.logout()
+      authStore.resetAuth()
       router.push({ name: 'Login' })
+    } else if (error.response?.status === 403) {
+      alert('권한이 없습니다.')
+    } else if (error.response?.status >= 500) {
+      alert('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
     } else {
-      console.error('쓰레드 작성 실패:', error)
-      alert('쓰레드 작성에 실패했습니다.')
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        '쓰레드 작성에 실패했습니다.'
+      alert(errorMessage)
     }
   }
 }

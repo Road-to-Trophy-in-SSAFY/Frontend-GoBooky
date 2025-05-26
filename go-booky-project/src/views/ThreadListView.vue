@@ -1,8 +1,7 @@
 <!-- 쓰레드 전체 목록 조회 view -->
 <template>
   <div>
-    <div class="header-actions">
-    </div>
+    <div class="header-actions"></div>
 
     <!-- 카테고리 필터 -->
     <div class="category-filter">
@@ -34,7 +33,14 @@
           <h3>{{ thread.title }}</h3>
           <p>책: {{ thread.book.title }}</p>
           <p>카테고리: {{ thread.book.category_name }}</p>
-          <button @click="goToThreadDetail(thread.id)" class="detail-btn">자세히 보기</button>
+          <div class="thread-actions">
+            <button @click="goToThreadDetail(thread.id)" class="detail-btn">자세히 보기</button>
+          </div>
+          <button @click.stop="toggleLike(thread)" class="like-btn">
+            <span v-if="thread.liked">❤️</span>
+            <span v-else>🤍</span>
+            {{ thread.likes_count }}
+          </button>
         </div>
       </div>
     </div>
@@ -46,25 +52,28 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useThreadStore } from '@/stores/thread'
 import { useRouter } from 'vue-router'
 import { categoriesData } from '@/stores/categoriesData.js'
+import { useThreads } from '@/composables/useThreads'
 
-const threadStore = useThreadStore()
+// 지침에 따른 Composables 사용
+const { threads, fetchThreads, toggleLike: toggleThreadLike } = useThreads()
 const router = useRouter()
-const threads = ref([])
 const categories = categoriesData
 const selectedCategory = ref(null)
 const API_URL = 'http://127.0.0.1:8000'
-const defaultImageUrl = '/default_thread_image.jpg'
 
 onMounted(async () => {
   await loadThreads()
 })
 
 const loadThreads = async () => {
-  await threadStore.getThreads()
-  threads.value = threadStore.threads
+  try {
+    await fetchThreads()
+    console.log('✅ [ThreadListView] 쓰레드 목록 로드 완료')
+  } catch (error) {
+    console.error('❌ [ThreadListView] 쓰레드 목록 로드 실패:', error)
+  }
 }
 
 const getThreadImage = (thread) => {
@@ -93,6 +102,16 @@ const filteredThreads = computed(() => {
 
 const goToThreadDetail = (threadId) => {
   router.push({ name: 'thread-detail', params: { id: threadId } })
+}
+
+const toggleLike = async (thread) => {
+  try {
+    await toggleThreadLike(thread.id)
+    console.log('✅ [ThreadListView] 좋아요 토글 성공:', thread.id)
+  } catch (error) {
+    console.error('❌ [ThreadListView] 좋아요 토글 실패:', error)
+    alert('로그인 후 이용 가능합니다.')
+  }
 }
 </script>
 
@@ -176,6 +195,23 @@ const goToThreadDetail = (threadId) => {
   background: #4caf50;
   color: #fff;
   border-color: #4caf50;
+}
+.thread-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.like-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.like-btn span {
+  font-size: 20px;
 }
 
 .thread-actions {
