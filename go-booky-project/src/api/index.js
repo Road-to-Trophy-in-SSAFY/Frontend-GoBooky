@@ -97,17 +97,16 @@ api.interceptors.response.use(
 
       // 토큰 갱신 요청의 401은 refresh token 만료
       if (originalRequest.url?.includes('/auth/jwt/refresh/')) {
-        console.log('🔒 [API][RES] Refresh token 만료 - 재로그인 필요')
+        console.log(
+          '🔒 [API][RES] Refresh token 만료 - 상태만 초기화 (리다이렉트는 라우터 가드에서 처리)',
+        )
         // 동적 import로 순환 참조 방지
         const { useAuthStore } = await import('@/stores/auth')
         const authStore = useAuthStore()
         await authStore.resetAuth()
 
-        // 로그인 페이지로 리다이렉트 (현재 페이지 정보 저장)
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-          const currentPath = window.location.pathname + window.location.search
-          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`
-        }
+        // ⚠️ 강제 리다이렉트 제거 - 라우터 가드에서 처리하도록 함
+        // 이렇게 하면 requiresAuth가 false인 페이지는 그대로 유지됨
 
         return Promise.reject(error)
       }
@@ -175,28 +174,32 @@ api.interceptors.response.use(
         '/auth/jwt/refresh/',
         '/auth/jwt/logout/',
         '/auth/auth/signup/',
-        '/auth/auth/verify-email/'
+        '/auth/auth/verify-email/',
       ]
 
-      const shouldShowToast = !skipToastUrls.some(url => originalRequest.url?.includes(url))
+      const shouldShowToast = !skipToastUrls.some((url) => originalRequest.url?.includes(url))
 
       if (shouldShowToast) {
         // 동적 import로 순환 참조 방지
-        import('@/composables/useToast').then(({ toast }) => {
-          toast.showApiError(error)
-        }).catch(err => {
-          console.error('❌ [API][RES] Toast 표시 실패:', err)
-        })
+        import('@/composables/useToast')
+          .then(({ toast }) => {
+            toast.showApiError(error)
+          })
+          .catch((err) => {
+            console.error('❌ [API][RES] Toast 표시 실패:', err)
+          })
       }
     } else if (error.request) {
       console.error('🌐 [API][RES] 네트워크 에러:', error.request)
 
       // 네트워크 오류는 항상 Toast로 표시
-      import('@/composables/useToast').then(({ toast }) => {
-        toast.showNetworkError(error)
-      }).catch(err => {
-        console.error('❌ [API][RES] Toast 표시 실패:', err)
-      })
+      import('@/composables/useToast')
+        .then(({ toast }) => {
+          toast.showNetworkError(error)
+        })
+        .catch((err) => {
+          console.error('❌ [API][RES] Toast 표시 실패:', err)
+        })
     } else {
       console.error('⚙️ [API][RES] 요청 설정 에러:', error.message)
     }

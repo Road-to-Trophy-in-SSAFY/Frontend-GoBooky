@@ -95,6 +95,14 @@ export function useAuth() {
       // 방문 기록 설정 (새로고침 시 silent refresh 활성화)
       sessionStorage.setItem('gobooky-visited', 'true')
 
+      // 로그인 후 쿠키 확인 (디버깅용)
+      console.log('🍪 [useAuth] 로그인 후 쿠키 확인:', document.cookie)
+
+      // HttpOnly 쿠키는 JavaScript로 읽을 수 없으므로 간접 확인
+      setTimeout(() => {
+        console.log('🍪 [useAuth] 1초 후 쿠키 재확인:', document.cookie)
+      }, 1000)
+
       console.log('✅ [useAuth] 로그인 성공:', response.user.email)
       return true
     } catch (err) {
