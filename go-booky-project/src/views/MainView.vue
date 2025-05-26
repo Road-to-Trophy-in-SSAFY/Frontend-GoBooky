@@ -48,6 +48,7 @@ import DeleteAccountModal from '@/components/ui/DeleteAccountModal.vue'
 import { useAuth } from '@/composables/useAuth'
 import { authAPI } from '@/api/auth'
 import { getDeleteAccountErrorMessage } from '@/utils/errorMessages'
+import { toast } from '@/composables/useToast'
 
 // 지침에 따른 Composables 사용
 const { user, isAuthenticated, logout } = useAuth()
@@ -60,11 +61,13 @@ const deleteModalRef = ref(null)
 const handleLogout = async () => {
   try {
     await logout()
+    // 로그아웃 성공 시 홈으로 이동 (useAuth에서 이미 처리됨)
     router.push('/')
     console.log('✅ [MainView] 로그아웃 성공')
   } catch (error) {
     console.error('❌ [MainView] 로그아웃 실패:', error)
-    modalText.value = '로그아웃 중 오류가 발생했습니다.'
+    // 전역 Toast 시스템에서 처리되므로 별도 모달 불필요
+    // modalText.value = '로그아웃 중 오류가 발생했습니다.'
   }
 }
 
@@ -82,6 +85,11 @@ const handleDeleteConfirm = async (password) => {
 
   try {
     await authAPI.deleteAccount({ password })
+
+    // 회원탈퇴 성공 Toast 표시
+    toast.success('회원탈퇴가 완료되었습니다.')
+
+    // 로그아웃 처리 (모든 스토어 초기화 포함)
     await logout()
 
     // 성공 단계 표시
