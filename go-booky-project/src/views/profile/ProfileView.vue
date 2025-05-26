@@ -36,8 +36,8 @@
         <p><strong>이메일:</strong> {{ profile.email }}</p>
         <p><strong>이름:</strong> {{ profile.last_name + profile.first_name }}</p>
         <p><strong>성별:</strong> {{ genderToKorean(profile.gender) }}</p>
-        <p><strong>주간 평균 독서 시간:</strong> {{ profile.weekly_read_time || '미입력' }} 시간</p>
-        <p><strong>연간 독서량:</strong> {{ profile.yearly_read_count || '미입력' }} 권</p>
+        <p><strong>주간 평균 독서 시간:</strong> {{ profile.weekly_read_time || 0 }} 시간</p>
+        <p><strong>연간 독서량:</strong> {{ profile.yearly_read_count || 0 }} 권</p>
         <p>
           <strong>관심 장르:</strong>
           {{
@@ -69,6 +69,8 @@
             id="weekly_read_time"
             v-model.number="editableProfile.weekly_read_time"
             class="form-control"
+            min="0"
+            placeholder="0"
           />
         </div>
 
@@ -79,6 +81,8 @@
             id="yearly_read_count"
             v-model.number="editableProfile.yearly_read_count"
             class="form-control"
+            min="0"
+            placeholder="0"
           />
         </div>
 
@@ -202,8 +206,8 @@ const fetchData = async () => {
 const startEditing = () => {
   isEditing.value = true
   editableProfile.value = {
-    weekly_read_time: profile.value.weekly_read_time,
-    yearly_read_count: profile.value.yearly_read_count,
+    weekly_read_time: profile.value.weekly_read_time || 0,
+    yearly_read_count: profile.value.yearly_read_count || 0,
     category_ids: profile.value.categories.map((cat) => cat.id),
   }
   profilePictureFile.value = null
