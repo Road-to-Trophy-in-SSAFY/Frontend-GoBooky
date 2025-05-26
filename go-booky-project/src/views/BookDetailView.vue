@@ -89,20 +89,20 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useBookStore } from '@/stores/books.js'
-import { useThreadStore } from '@/stores/thread'
+import { useBooks } from '@/composables/useBooks'
+import { useThreads } from '@/composables/useThreads'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute, useRouter } from 'vue-router'
 import Modal from '@/components/Modal.vue'
 import { QuillEditor } from '@vueup/vue-quill'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
-const bookStore = useBookStore()
-const threadStore = useThreadStore()
+const { selectedBook, fetchBook, isLoading: bookLoading, error: bookError } = useBooks()
+const { createThread, isLoading: threadLoading } = useThreads()
 const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
-const book = ref(null)
+const book = computed(() => selectedBook.value)
 const showWriteModal = ref(false)
 const isLoading = ref(false)
 const today = new Date().toISOString().split('T')[0]
@@ -147,16 +147,20 @@ const handleThreadWriteClick = () => {
 }
 
 onMounted(async () => {
-  book.value = await bookStore.getBookDetail(route.params.id)
-  if (book.value) {
-    threadForm.value.book = book.value.id
+  try {
+    await fetchBook(route.params.id)
+    if (book.value) {
+      threadForm.value.book = book.value.id
+    }
+  } catch (error) {
+    console.error('책 정보 로드 실패:', error)
   }
 })
 
 const submitThread = async () => {
   try {
     isLoading.value = true
-    await threadStore.createThread(threadForm.value)
+    await createThread(threadForm.value)
     isLoading.value = false
     showWriteModal.value = false
 

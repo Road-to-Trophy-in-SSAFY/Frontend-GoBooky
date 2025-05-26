@@ -101,12 +101,14 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * 쿠키 존재 여부 확인 (HttpOnly 쿠키는 읽을 수 없지만 존재 여부는 확인 가능)
+   * 쿠키 존재 여부 확인 (HttpOnly 쿠키는 직접 읽을 수 없으므로 API 호출로 확인)
    * @param {string} cookieName 쿠키 이름
-   * @returns {boolean} 쿠키 존재 여부
+   * @returns {boolean} 쿠키 존재 여부 (추정)
    */
   function hasCookie(cookieName) {
     if (typeof document === 'undefined') return false
+    // HttpOnly 쿠키는 JavaScript에서 읽을 수 없으므로
+    // 일반 쿠키만 확인하고, 실제 존재 여부는 API 호출로 검증
     return document.cookie.split(';').some((cookie) => cookie.trim().startsWith(cookieName + '='))
   }
 
@@ -124,24 +126,25 @@ export const useAuthStore = defineStore('auth', () => {
         return true
       }
 
-      // refresh token 쿠키가 있는지 먼저 확인
-      const hasRefreshCookie = hasCookie('gobooky-refresh')
+      // 첫 접속인지 확인 (sessionStorage 활용)
+      const hasVisited = sessionStorage.getItem('gobooky-visited')
 
-      if (!hasRefreshCookie) {
-        console.log('👤 [AuthStore] Refresh token 쿠키 없음 - 게스트 모드')
+      if (!hasVisited) {
+        // 첫 접속 - API 호출 없이 게스트 모드
+        console.log('👤 [AuthStore] 첫 접속 - 게스트 모드')
+        sessionStorage.setItem('gobooky-visited', 'true')
         return false
       }
 
-      // refresh token 쿠키가 있으면 API 호출
-      console.log('🔄 [AuthStore] Refresh token 쿠키 발견 - 인증 시도')
+      // 재방문 (새로고침 등) - silent refresh 시도
+      console.log('🔄 [AuthStore] 재방문 감지 - Silent refresh 시도')
 
-      const success = await refreshToken()
-
+      const success = await silentRefresh()
       if (success) {
         console.log('✅ [AuthStore] 토큰 갱신으로 인증 복구')
         return true
       } else {
-        console.log('👤 [AuthStore] Refresh token 만료 - 게스트 모드')
+        console.log('👤 [AuthStore] Refresh token 없음/만료 - 게스트 모드')
         return false
       }
     } catch (error) {
@@ -152,21 +155,36 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * 토큰 갱신 (silent refresh)
+   * Silent refresh - 조용한 토큰 갱신 (초기화 시 사용)
+   * @returns {Promise<boolean>} 성공 여부
+   */
+  async function silentRefresh() {
+    try {
+      // 동적 import로 순환 참조 방지
+      const { authAPI } = await import('@/api/auth')
+      const response = await authAPI.refreshToken()
+
+      // 새 토큰과 사용자 정보 저장
+      setAuth(response.access, response.user)
+      return true
+    } catch (error) {
+      // Silent refresh는 실패해도 에러 로그를 출력하지 않음
+      // 401 에러는 정상적인 상황 (쿠키 없음 또는 만료)
+      if (error.response?.status !== 401) {
+        console.error('❌ [AuthStore] Silent refresh 예상치 못한 오류:', error)
+      }
+      resetAuth()
+      return false
+    }
+  }
+
+  /**
+   * 토큰 갱신 (명시적 호출 시 사용)
    * @returns {Promise<boolean>} 성공 여부
    */
   async function refreshToken() {
     try {
       console.log('🔄 [AuthStore] 토큰 갱신 시도')
-
-      // 쿠키 상태 확인
-      const hasRefreshCookie = hasCookie('gobooky-refresh')
-      console.log('🍪 [AuthStore] Refresh 쿠키 존재 여부:', hasRefreshCookie)
-
-      if (!hasRefreshCookie) {
-        console.log('❌ [AuthStore] Refresh 쿠키 없음 - 토큰 갱신 불가')
-        return false
-      }
 
       // 동적 import로 순환 참조 방지
       const { authAPI } = await import('@/api/auth')
@@ -208,6 +226,7 @@ export const useAuthStore = defineStore('auth', () => {
     updateToken,
     setProfileComplete,
     initAuth,
+    silentRefresh,
     refreshToken,
     hasCookie,
   }

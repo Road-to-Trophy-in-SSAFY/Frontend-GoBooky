@@ -47,6 +47,9 @@ export function useAuth() {
       // 스토어에 인증 정보 저장
       await authStore.setAuth(response.access, response.user)
 
+      // 방문 기록 설정 (새로고침 시 silent refresh 활성화)
+      sessionStorage.setItem('gobooky-visited', 'true')
+
       console.log('✅ [useAuth] 로그인 성공:', response.user.email)
       return true
     } catch (err) {
@@ -84,6 +87,9 @@ export function useAuth() {
       // 스토어 초기화
       await authStore.resetAuth()
 
+      // 방문 기록 제거 (다음 접속 시 첫 방문으로 처리)
+      sessionStorage.removeItem('gobooky-visited')
+
       // 로그인 페이지로 리다이렉트
       await router.push('/login')
 
@@ -94,6 +100,10 @@ export function useAuth() {
 
       // 로그아웃 실패해도 클라이언트 상태는 초기화
       await authStore.resetAuth()
+
+      // 방문 기록 제거 (다음 접속 시 첫 방문으로 처리)
+      sessionStorage.removeItem('gobooky-visited')
+
       await router.push('/login')
 
       error.value = '로그아웃 중 오류가 발생했습니다.'
