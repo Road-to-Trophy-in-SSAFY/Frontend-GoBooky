@@ -54,13 +54,13 @@ export const useBookStore = defineStore(
         })
       }
 
-      // 검색 필터
+      // 검색 필터 (title, author, description에서 검색)
       if (filters.value.search) {
         const searchTerm = filters.value.search.toLowerCase()
         result = result.filter(
           (book) =>
-            book.title.toLowerCase().includes(searchTerm) ||
-            book.author.toLowerCase().includes(searchTerm) ||
+            book.title?.toLowerCase().includes(searchTerm) ||
+            book.author?.toLowerCase().includes(searchTerm) ||
             book.description?.toLowerCase().includes(searchTerm),
         )
       }
