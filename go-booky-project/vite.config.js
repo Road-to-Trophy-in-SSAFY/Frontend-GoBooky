@@ -12,6 +12,10 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  define: {
+    // 환경 변수 정의
+    'import.meta.env.VITE_API_BASE_URL': JSON.stringify('http://127.0.0.1:8000'),
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,

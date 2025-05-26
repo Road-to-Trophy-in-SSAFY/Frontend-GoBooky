@@ -175,6 +175,7 @@ api.interceptors.response.use(
         '/auth/jwt/logout/',
         '/auth/auth/signup/',
         '/auth/auth/verify-email/',
+        '/auth/auth/profile/', // 프로필 관련 API는 미구현 상태이므로 토스트 제외
       ]
 
       const shouldShowToast = !skipToastUrls.some((url) => originalRequest.url?.includes(url))
@@ -183,7 +184,11 @@ api.interceptors.response.use(
         // 동적 import로 순환 참조 방지
         import('@/composables/useToast')
           .then(({ toast }) => {
-            toast.showApiError(error)
+            const message =
+              error.response?.data?.detail ||
+              error.response?.data?.message ||
+              '서버 오류가 발생했습니다.'
+            toast.error(message)
           })
           .catch((err) => {
             console.error('❌ [API][RES] Toast 표시 실패:', err)
@@ -195,7 +200,7 @@ api.interceptors.response.use(
       // 네트워크 오류는 항상 Toast로 표시
       import('@/composables/useToast')
         .then(({ toast }) => {
-          toast.showNetworkError(error)
+          toast.error('네트워크 연결을 확인해주세요.')
         })
         .catch((err) => {
           console.error('❌ [API][RES] Toast 표시 실패:', err)
