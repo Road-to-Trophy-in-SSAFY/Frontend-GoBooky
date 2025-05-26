@@ -4,7 +4,7 @@
 
 ## 📁 테스트 구조
 
-```
+```text
 tests/
 ├── api/                    # Playwright API 테스트
 │   ├── auth.test.js       # 인증 관련 API 테스트
