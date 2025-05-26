@@ -29,21 +29,14 @@
   </div>
   <div class="main-container">
     <Modal v-if="modalText" :text="modalText" @close="modalText = ''" />
-    <Modal v-if="showDeleteModal" @close="closeDeleteModal">
-      <template #default>
-        <div style="margin-bottom: 1rem">정말 계정을 삭제하시겠습니까?</div>
-        <input
-          v-model="deletePassword"
-          type="password"
-          placeholder="비밀번호 입력"
-          style="margin-bottom: 1rem"
-        />
-        <div style="display: flex; gap: 1rem; justify-content: center">
-          <button @click="closeDeleteModal">취소</button>
-          <button @click="handleWithdraw" style="background: #e74c3c">삭제</button>
-        </div>
-      </template>
-    </Modal>
+    <DeleteAccountModal
+      v-if="showDeleteModal"
+      ref="deleteModalRef"
+      :isLoading="isDeleting"
+      @close="closeDeleteModal"
+      @confirm="handleDeleteConfirm"
+      @success="handleDeleteSuccess"
+    />
   </div>
 </template>
 
@@ -51,19 +44,18 @@
 import { ref } from 'vue'
 import { useRouter, RouterLink, RouterView } from 'vue-router'
 import Modal from '@/components/ui/Modal.vue'
+import DeleteAccountModal from '@/components/ui/DeleteAccountModal.vue'
 import { useAuth } from '@/composables/useAuth'
 import { authAPI } from '@/api/auth'
+import { getDeleteAccountErrorMessage } from '@/utils/errorMessages'
 
 // 지침에 따른 Composables 사용
 const { user, isAuthenticated, logout } = useAuth()
 const router = useRouter()
 const modalText = ref('')
 const showDeleteModal = ref(false)
-const deletePassword = ref('')
-
-function handleError(err, fallbackMsg = '회원탈퇴 실패') {
-  modalText.value = err.response?.data?.detail || fallbackMsg
-}
+const isDeleting = ref(false)
+const deleteModalRef = ref(null)
 
 const handleLogout = async () => {
   try {
@@ -78,31 +70,35 @@ const handleLogout = async () => {
 
 function openDeleteModal() {
   showDeleteModal.value = true
-  deletePassword.value = ''
-}
-function closeDeleteModal() {
-  showDeleteModal.value = false
-  deletePassword.value = ''
 }
 
-const handleWithdraw = async () => {
-  if (!deletePassword.value) {
-    modalText.value = '비밀번호를 입력해주세요.'
-    return
-  }
+function closeDeleteModal() {
+  showDeleteModal.value = false
+  isDeleting.value = false
+}
+
+const handleDeleteConfirm = async (password) => {
+  isDeleting.value = true
+
   try {
-    await authAPI.deleteAccount({ password: deletePassword.value })
+    await authAPI.deleteAccount({ password })
     await logout()
-    showDeleteModal.value = false
-    modalText.value = '회원탈퇴가 완료되었습니다.'
-    setTimeout(() => {
-      router.push('/')
-    }, 1000)
+
+    // 성공 단계 표시
+    deleteModalRef.value?.showSuccess()
     console.log('✅ [MainView] 회원탈퇴 성공')
   } catch (err) {
     console.error('❌ [MainView] 회원탈퇴 실패:', err)
-    handleError(err)
+    isDeleting.value = false
+
+    const errorMessage = getDeleteAccountErrorMessage(err)
+    deleteModalRef.value?.showPasswordError(errorMessage)
   }
+}
+
+const handleDeleteSuccess = () => {
+  showDeleteModal.value = false
+  router.push('/')
 }
 </script>
 
