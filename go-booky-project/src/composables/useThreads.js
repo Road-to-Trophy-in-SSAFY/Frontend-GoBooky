@@ -148,11 +148,21 @@ export function useThreads() {
    * @returns {Promise} 좋아요 상태
    */
   const toggleLike = async (threadId) => {
-    // 현재 쓰레드 상태 가져오기
-    const currentThread = threads.value.find((t) => t.id === threadId) || selectedThread.value
+    // 🔧 타입 안전성 보장
+    const numericThreadId = parseInt(threadId)
+    if (!numericThreadId || isNaN(numericThreadId)) {
+      console.error('❌ [useThreads] 유효하지 않은 쓰레드 ID:', threadId)
+      throw new Error('유효하지 않은 쓰레드 ID입니다.')
+    }
+
+    // 현재 쓰레드 상태 가져오기 (타입 안전한 비교)
+    const currentThread =
+      threads.value.find((t) => t.id === numericThreadId) ||
+      (selectedThread.value?.id === numericThreadId ? selectedThread.value : null)
+
     if (!currentThread) {
-      console.error('❌ [useThreads] 쓰레드를 찾을 수 없음:', threadId)
-      return
+      console.error('❌ [useThreads] 쓰레드를 찾을 수 없음:', numericThreadId)
+      throw new Error('쓰레드를 찾을 수 없습니다.')
     }
 
     // 원본 상태 저장 (롤백용)
@@ -164,26 +174,26 @@ export function useThreads() {
     const optimisticCount = originalCount + (optimisticLiked ? 1 : -1)
 
     console.log('🚀 [useThreads] Optimistic UI 업데이트:', {
-      threadId,
+      threadId: numericThreadId,
       from: { liked: originalLiked, count: originalCount },
       to: { liked: optimisticLiked, count: optimisticCount },
     })
 
-    // 즉시 UI 업데이트
-    threadStore.updateThreadLike(threadId, optimisticLiked, optimisticCount)
+    // 즉시 UI 업데이트 (타입 안전한 ID 사용)
+    threadStore.updateThreadLike(numericThreadId, optimisticLiked, optimisticCount)
 
     try {
-      // 2. 백그라운드에서 API 호출
-      const response = await execute(() => threadsAPI.toggleLike(threadId))
+      // 2. 백그라운드에서 API 호출 (원본 ID 사용 - API는 문자열/숫자 모두 처리)
+      const response = await execute(() => threadsAPI.toggleLike(numericThreadId))
 
       // 3. 서버 응답과 다르면 수정 (보통은 같음)
       if (response.liked !== optimisticLiked || response.likes_count !== optimisticCount) {
         console.log('🔄 [useThreads] 서버 응답으로 상태 수정:', response)
-        threadStore.updateThreadLike(threadId, response.liked, response.likes_count)
+        threadStore.updateThreadLike(numericThreadId, response.liked, response.likes_count)
       }
 
       console.log('✅ [useThreads] 좋아요 토글 성공:', {
-        threadId,
+        threadId: numericThreadId,
         liked: response.liked,
         action: response.action,
       })
@@ -192,7 +202,7 @@ export function useThreads() {
     } catch (err) {
       // 4. 실패 시 원래 상태로 롤백
       console.error('❌ [useThreads] 좋아요 토글 실패 - 롤백:', err)
-      threadStore.updateThreadLike(threadId, originalLiked, originalCount)
+      threadStore.updateThreadLike(numericThreadId, originalLiked, originalCount)
 
       // 세분화된 에러 처리 (지침 준수: "4xx/5xx 오류 카테고리화")
       let errorMessage = '좋아요 처리에 실패했습니다.'

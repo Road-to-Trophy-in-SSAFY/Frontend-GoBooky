@@ -183,11 +183,11 @@ const editorOptions = {
 
 const loadThread = async () => {
   try {
-    const threadId = route.params.id
+    const threadId = parseInt(route.params.id)
 
     // ID가 유효한지 확인
-    if (!threadId || threadId === 'undefined') {
-      console.error('유효하지 않은 쓰레드 ID:', threadId)
+    if (!threadId || isNaN(threadId)) {
+      console.error('유효하지 않은 쓰레드 ID:', route.params.id)
       router.push({ name: 'threads' })
       return
     }
@@ -231,7 +231,12 @@ const handleUpdateThread = async () => {
       return
     }
 
-    const threadId = route.params.id
+    const threadId = parseInt(route.params.id)
+    if (!threadId || isNaN(threadId)) {
+      console.error('❌ [ThreadDetailView] 유효하지 않은 쓰레드 ID:', route.params.id)
+      return
+    }
+
     await updateThreadAPI(threadId, editForm.value)
 
     // 수정 완료 후 최신 데이터 다시 불러오기
@@ -257,7 +262,12 @@ const handleUpdateThread = async () => {
 
 const confirmDelete = async () => {
   try {
-    const threadId = route.params.id
+    const threadId = parseInt(route.params.id)
+    if (!threadId || isNaN(threadId)) {
+      console.error('❌ [ThreadDetailView] 유효하지 않은 쓰레드 ID:', route.params.id)
+      return
+    }
+
     await deleteThreadAPI(threadId)
     router.push({ name: 'threads' })
     console.log('✅ [ThreadDetailView] 쓰레드 삭제 성공')
@@ -268,7 +278,14 @@ const confirmDelete = async () => {
 
 const handleLikeThread = async () => {
   try {
-    const threadId = route.params.id
+    // 🔧 타입 불일치 수정: 문자열 → 숫자 변환
+    const threadId = parseInt(route.params.id)
+
+    if (!threadId || isNaN(threadId)) {
+      console.error('❌ [ThreadDetailView] 유효하지 않은 쓰레드 ID:', route.params.id)
+      showErrorToast('유효하지 않은 쓰레드입니다.')
+      return
+    }
 
     // 애니메이션 시작 (지침 준수: "비즈니스 로직은 훅으로")
     startAnimation(threadId)
@@ -292,9 +309,9 @@ let imageCheckInterval = null
 
 onMounted(async () => {
   // 컴포넌트 마운트 시 ID 유효성 검사
-  const threadId = route.params.id
-  if (!threadId || threadId === 'undefined') {
-    console.error('유효하지 않은 쓰레드 ID:', threadId)
+  const threadId = parseInt(route.params.id)
+  if (!threadId || isNaN(threadId)) {
+    console.error('유효하지 않은 쓰레드 ID:', route.params.id)
     router.push({ name: 'threads' }) // 유효하지 않은 ID인 경우 목록 페이지로 리다이렉트
     return
   }
