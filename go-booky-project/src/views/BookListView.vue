@@ -22,7 +22,9 @@ const bookStore = useBookStore()
 
 onMounted(async () => {
   try {
-    await fetchBooks()
+    const response = await fetchBooks()
+    // useBooks에서 가져온 데이터를 bookStore에 설정
+    bookStore.setBooks(response.results || response)
     console.log('✅ [BookListView] 도서 목록 로드 완료')
   } catch (error) {
     console.error('❌ [BookListView] 도서 목록 로드 실패:', error)
