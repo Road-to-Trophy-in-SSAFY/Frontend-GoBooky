@@ -89,49 +89,55 @@
         <div class="book-info-section">
           <div class="book-meta">
             <h1 class="book-title">{{ book.title }}</h1>
-            <div class="book-author-info">
-              <span class="author-label">저자</span>
-              <span class="book-author">{{ book.author }}</span>
-            </div>
-            <div class="book-publisher-info">
-              <span class="publisher-label">출판사</span>
-              <span class="book-publisher">{{ book.publisher }}</span>
-            </div>
-            <div class="book-date-info">
-              <span class="date-label">출간일</span>
-              <span class="book-date">{{ formatDate(book.pub_date) }}</span>
-            </div>
-            <div v-if="book.isbn" class="book-isbn-info">
-              <span class="isbn-label">ISBN</span>
-              <span class="book-isbn">{{ book.isbn }}</span>
+            <div class="book-details-grid">
+              <div class="book-detail-item">
+                <div class="detail-icon">👤</div>
+                <div class="detail-content">
+                  <span class="detail-label">저자</span>
+                  <span class="detail-value">{{ book.author }}</span>
+                </div>
+              </div>
+              <div class="book-detail-item">
+                <div class="detail-icon">🏢</div>
+                <div class="detail-content">
+                  <span class="detail-label">출판사</span>
+                  <span class="detail-value">{{ book.publisher }}</span>
+                </div>
+              </div>
+              <div class="book-detail-item">
+                <div class="detail-icon">📅</div>
+                <div class="detail-content">
+                  <span class="detail-label">출간일</span>
+                  <span class="detail-value">{{ formatDate(book.pub_date) }}</span>
+                </div>
+              </div>
+              <div v-if="book.isbn" class="book-detail-item">
+                <div class="detail-icon">🔢</div>
+                <div class="detail-content">
+                  <span class="detail-label">ISBN</span>
+                  <span class="detail-value">{{ book.isbn }}</span>
+                </div>
+              </div>
             </div>
           </div>
 
           <div v-if="book.description" class="book-description">
-            <h3 class="description-title">책 소개</h3>
+            <h3 class="description-title">
+              <span class="description-icon">📖</span>
+              책 소개
+            </h3>
             <p class="description-text">{{ book.description }}</p>
           </div>
         </div>
       </div>
-    </div>
-    <!-- 페이드 인/아웃 애니메이션 적용 -->
-    <transition name="fade" mode="out-in">
-      <div v-if="book && !isBookLoading" class="book-content" :key="book.id">
-        <p>{{ book.title }}</p>
-        <p>{{ book.author }}</p>
-        <p>{{ book.publisher }}</p>
-        <p>{{ book.pub_date }}</p>
-        <img :src="book.cover" alt="Book Cover" />
-        <p>{{ book.description }}</p>
-        <p>ISBN: {{ book.isbn }}</p>
-
-        <!-- 연관 도서 컴포넌트 추가 -->
+      <!-- 연관 도서 섹션 -->
+      <div
+        v-if="book && book.related_books && book.related_books.length > 0"
+        class="related-books-section"
+      >
         <RelatedBooks :related-books="book.related_books" />
       </div>
-      <div v-else-if="!isBookLoading && !book" class="book-error">
-        <p>책 정보를 불러올 수 없습니다.</p>
-      </div>
-    </transition>
+    </div>
 
     <!-- 쓰레드 작성 모달 -->
     <Modal
@@ -152,125 +158,55 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="title" class="form-label">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+        <div class="form-layout">
+          <div class="form-left">
+            <div class="form-group">
+              <label for="title" class="form-label">
+                <span class="label-icon">📝</span>
+                제목
+              </label>
+              <input
+                id="title"
+                v-model="threadForm.title"
+                type="text"
+                required
+                placeholder="독서 기록의 제목을 입력하세요"
+                class="form-input"
               />
-              <path
-                d="M14 2V8H20"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            제목
-          </label>
-          <input
-            id="title"
-            v-model="threadForm.title"
-            type="text"
-            required
-            placeholder="독서 기록의 제목을 입력하세요"
-            class="form-input"
-          />
-        </div>
+            </div>
 
-        <div class="form-group">
-          <label for="content" class="form-label">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+            <div class="form-group">
+              <label for="reading_date" class="form-label">
+                <span class="label-icon">📅</span>
+                독서 완료일
+              </label>
+              <input
+                id="reading_date"
+                v-model="threadForm.reading_date"
+                type="date"
+                required
+                :max="today"
+                class="form-input"
               />
-              <path
-                d="M14 2V8H20"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M16 13H8"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M16 17H8"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            내용
-          </label>
-          <QuillEditor
-            v-model:content="threadForm.content"
-            contentType="html"
-            theme="snow"
-            toolbar="essential"
-            :options="editorOptions"
-            class="editor-container"
-          />
-        </div>
+            </div>
+          </div>
 
-        <div class="form-group">
-          <label for="reading_date" class="form-label">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <rect
-                x="3"
-                y="4"
-                width="18"
-                height="18"
-                rx="2"
-                ry="2"
-                stroke="currentColor"
-                stroke-width="2"
+          <div class="form-right">
+            <div class="form-group content-group">
+              <label for="content" class="form-label">
+                <span class="label-icon">✍️</span>
+                독서 후기
+              </label>
+              <QuillEditor
+                v-model:content="threadForm.content"
+                contentType="html"
+                theme="snow"
+                toolbar="essential"
+                :options="editorOptions"
+                class="editor-container"
               />
-              <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2" />
-              <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2" />
-              <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2" />
-            </svg>
-            독서 완료일
-          </label>
-          <input
-            id="reading_date"
-            v-model="threadForm.reading_date"
-            type="date"
-            required
-            :max="today"
-            class="form-input"
-          />
+            </div>
+          </div>
         </div>
 
         <div class="form-actions">
@@ -280,6 +216,7 @@
             :disabled="isLoading"
             class="cancel-btn"
           >
+            <span class="btn-icon">❌</span>
             취소
           </button>
           <button
@@ -289,21 +226,7 @@
             class="submit-btn"
           >
             <span v-if="!isLoading" class="submit-text">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M20 6L9 17L4 12"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
+              <span class="btn-icon">✅</span>
               작성하기
             </span>
             <span v-else class="loading-text">
@@ -430,7 +353,6 @@ const loadBookData = async (bookId) => {
     }, 300)
   }
 }
-
 
 // 쓰레드 작성 버튼 클릭 핸들러
 const handleThreadWriteClick = () => {
@@ -666,15 +588,62 @@ const submitThread = async () => {
   line-height: 1.2;
 }
 
-.book-author-info,
-.book-publisher-info,
-.book-date-info,
-.book-isbn-info {
+/* 책 상세 정보 그리드 */
+.book-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.book-detail-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid #f3f4f6;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.book-detail-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-color: #cbd5e1;
+}
+
+.detail-icon {
+  font-size: 24px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.detail-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
 }
 
 /* 페이드 애니메이션 */
@@ -761,11 +730,6 @@ const submitThread = async () => {
   gap: 8px;
 }
 
-.description-title::before {
-  content: '📖';
-  font-size: 20px;
-}
-
 .description-text {
   font-size: 15px;
   line-height: 1.7;
@@ -773,153 +737,57 @@ const submitThread = async () => {
   margin: 0;
 }
 
-/* 모달 스타일 */
-.thread-modal {
-  max-width: 800px;
-}
-
-.thread-write-form {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.selected-book-info {
-  display: flex;
-  gap: 16px;
-  padding: 20px;
-  background: #f8fafc;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-}
-
-.selected-book-cover {
-  flex-shrink: 0;
-}
-
-.selected-book-cover img {
-  width: 60px;
-  height: 80px;
-  object-fit: cover;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.selected-book-details {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-}
-
-.selected-book-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1f2937;
-  margin: 0;
-  line-height: 1.3;
-}
-
-.selected-book-author {
-  font-size: 14px;
-  color: #6b7280;
-  margin: 0;
-}
-
-.book-loading .loading-spinner {
-  border: 5px solid #f3f3f3;
-  border-top: 5px solid #4caf50;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 2s linear infinite;
-  margin-bottom: 20px;
-}
-
-.book-error {
-  text-align: center;
-  padding: 40px;
-  color: #d32f2f;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-.author-label,
-.publisher-label,
-.date-label,
-.isbn-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #6b7280;
-  min-width: 80px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.book-author,
-.book-publisher,
-.book-date,
-.book-isbn {
-  font-size: 16px;
-  font-weight: 500;
-  color: #1f2937;
-}
-
+/* 책 설명 스타일 */
 .book-description {
-  background: #f8fafc;
-  border-radius: 16px;
-  padding: 24px;
-  border-left: 4px solid #3b82f6;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 20px;
+  padding: 32px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .description-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
-  color: #1f2937;
-  margin: 0 0 16px 0;
+  color: #1e293b;
+  margin: 0 0 20px 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
-.description-title::before {
-  content: '📖';
-  font-size: 20px;
+.description-icon {
+  font-size: 24px;
 }
 
 .description-text {
-  font-size: 15px;
-  line-height: 1.7;
-  color: #4b5563;
+  font-size: 16px;
+  line-height: 1.8;
+  color: #475569;
   margin: 0;
 }
 
 /* 모달 스타일 */
 .thread-modal {
-  max-width: 800px;
+  max-width: 1000px;
+  width: 95vw;
 }
 
 .thread-write-form {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 32px;
+  padding: 8px;
 }
 
 .selected-book-info {
   display: flex;
-  gap: 16px;
-  padding: 20px;
-  background: #f8fafc;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  gap: 20px;
+  padding: 24px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .selected-book-cover {
@@ -927,11 +795,11 @@ const submitThread = async () => {
 }
 
 .selected-book-cover img {
-  width: 60px;
-  height: 80px;
+  width: 80px;
+  height: 110px;
   object-fit: cover;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
 .selected-book-details {
@@ -943,91 +811,136 @@ const submitThread = async () => {
 }
 
 .selected-book-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
-  color: #1f2937;
+  color: #1e293b;
   margin: 0;
   line-height: 1.3;
 }
 
 .selected-book-author {
-  font-size: 14px;
-  color: #6b7280;
+  font-size: 15px;
+  color: #64748b;
   margin: 0;
+  font-weight: 500;
+}
+
+/* 폼 레이아웃 */
+.form-layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 32px;
+  min-height: 400px;
+}
+
+.form-left {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form-right {
+  display: flex;
+  flex-direction: column;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+}
+
+.content-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .form-label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.label-icon {
+  font-size: 18px;
 }
 
 .form-input {
-  padding: 12px 16px;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
+  padding: 16px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
   font-size: 16px;
-  transition: border-color 0.2s ease;
+  transition: all 0.3s ease;
   background: white;
+  font-weight: 500;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
 }
 
 .editor-container {
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
   overflow: hidden;
-  transition: border-color 0.2s ease;
+  transition: all 0.3s ease;
+  flex: 1;
+  min-height: 300px;
 }
 
 .editor-container:focus-within {
   border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
 }
 
 .form-actions {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   justify-content: flex-end;
-  padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 8px;
 }
 
 .cancel-btn,
 .submit-btn {
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 14px;
+  padding: 16px 32px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 16px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-width: 140px;
+  justify-content: center;
+}
+
+.btn-icon {
+  font-size: 16px;
 }
 
 .cancel-btn {
   background: white;
-  color: #6b7280;
-  border: 2px solid #e5e7eb;
+  color: #64748b;
+  border: 2px solid #e2e8f0;
 }
 
 .cancel-btn:hover:not(:disabled) {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .submit-btn {
@@ -1043,8 +956,8 @@ const submitThread = async () => {
 }
 
 .submit-btn:disabled {
-  background: #e5e7eb;
-  color: #9ca3af;
+  background: #e2e8f0;
+  color: #94a3b8;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
@@ -1191,22 +1104,15 @@ const submitThread = async () => {
     gap: 12px;
   }
 
-  .book-author-info,
-  .book-publisher-info,
-  .book-date-info,
-  .book-isbn-info {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    padding: 8px 0;
+  .book-details-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
 
-  .author-label,
-  .publisher-label,
-  .date-label,
-  .isbn-label {
-    min-width: auto;
-    font-size: 12px;
+  .form-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    min-height: auto;
   }
 
   .form-actions {
@@ -1216,6 +1122,16 @@ const submitThread = async () => {
   .cancel-btn,
   .submit-btn {
     justify-content: center;
+  }
+
+  .thread-modal {
+    width: 98vw;
+    max-width: none;
+  }
+
+  .related-books-section {
+    padding: 24px;
+    margin-top: 24px;
   }
 }
 
@@ -1243,5 +1159,15 @@ const submitThread = async () => {
   .selected-book-info {
     padding: 16px;
   }
+}
+
+/* 연관 도서 섹션 */
+.related-books-section {
+  margin-top: 40px;
+  padding: 40px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 </style>
