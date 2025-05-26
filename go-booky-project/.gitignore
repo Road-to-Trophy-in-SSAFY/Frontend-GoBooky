@@ -22,6 +22,8 @@ docs
 scripts
 .vscode/*
 !.vscode/extensions.json
+docs
+scripts
 .idea
 *.suo
 *.ntvs*

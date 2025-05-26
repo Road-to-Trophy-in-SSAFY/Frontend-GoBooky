@@ -1,4 +1,4 @@
-import api from './index'
+import api from '@/api/index'
 
 /**
  * 지침에 따른 도서 API 서비스

@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { booksAPI } from '@/api/books'
-import { useApi } from './useApi'
+import { useApi } from '@/composables/useApi'
 
 /**
  * 지침에 따른 도서 Composable
