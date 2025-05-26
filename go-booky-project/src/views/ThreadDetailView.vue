@@ -108,7 +108,7 @@ const {
   toggleLike,
   isLoading,
 } = useThreads()
-const { validate, clearErrors } = useValidation(combinedSchemas.thread)
+const { validate, clearErrors } = useValidation(combinedSchemas.threadUpdate)
 
 const thread = computed(() => selectedThread.value)
 const showEditModal = ref(false)
@@ -203,8 +203,14 @@ const handleUpdateThread = async () => {
   try {
     clearErrors()
 
-    // 지침에 따른 검증
-    const isValid = await validate(editForm.value)
+    // 수정용 검증 (book 필드 제외)
+    const updateData = {
+      title: editForm.value.title,
+      content: editForm.value.content,
+      reading_date: editForm.value.reading_date,
+    }
+
+    const isValid = await validate(updateData)
     if (!isValid) {
       console.log('❌ [ThreadDetailView] 폼 검증 실패')
       return
@@ -213,10 +219,24 @@ const handleUpdateThread = async () => {
     const threadId = route.params.id
     await updateThreadAPI(threadId, editForm.value)
 
+    // 수정 완료 후 최신 데이터 다시 불러오기
+    await fetchThread(threadId)
+
+    // editForm도 최신 데이터로 업데이트
+    if (thread.value) {
+      editForm.value = {
+        title: thread.value.title,
+        content: thread.value.content,
+        reading_date: thread.value.reading_date,
+        book: thread.value.book?.id || null,
+      }
+    }
+
     showEditModal.value = false
     console.log('✅ [ThreadDetailView] 쓰레드 수정 성공')
   } catch (error) {
     console.error('❌ [ThreadDetailView] 쓰레드 수정 실패:', error)
+    alert('쓰레드 수정에 실패했습니다.')
   }
 }
 

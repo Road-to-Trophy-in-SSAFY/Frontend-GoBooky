@@ -245,6 +245,13 @@ export const combinedSchemas = {
     reading_date: validationSchemas.date,
     book: yup.number().required('도서를 선택해주세요.'),
   }),
+
+  // 쓰레드 수정 (book 필드 제외)
+  threadUpdate: yup.object({
+    title: validationSchemas.threadTitle,
+    content: validationSchemas.threadContent,
+    reading_date: validationSchemas.date,
+  }),
 }
 
 /**
