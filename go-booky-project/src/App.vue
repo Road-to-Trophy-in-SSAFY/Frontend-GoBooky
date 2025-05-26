@@ -15,12 +15,16 @@
     <Suspense v-else>
       <RouterView />
     </Suspense>
+
+    <!-- 토스트 알림 -->
+    <Toast />
   </div>
 </template>
 
 <script setup>
 import { RouterView } from 'vue-router'
 import { ref, onMounted } from 'vue'
+import Toast from '@/components/Toast.vue'
 
 // 부트스트랩 게이트 로딩 상태
 const isBootstrapping = ref(true)

@@ -8,6 +8,7 @@ import { authAPI } from '@/api/auth'
  * - 인증 로직 캡슐화
  * - 스토어와 API 연결
  * - 에러 처리 및 로딩 상태 관리
+ * - 로그아웃 시 모든 Pinia 스토어 초기화
  */
 export function useAuth() {
   const router = useRouter()
@@ -27,6 +28,50 @@ export function useAuth() {
    */
   const clearError = () => {
     error.value = null
+  }
+
+  /**
+   * 모든 Pinia 스토어 초기화 (지침에 따른 전역 상태 초기화)
+   */
+  const resetAllStores = async () => {
+    try {
+      console.log('🔄 [useAuth] 모든 Pinia 스토어 초기화 시작')
+
+      // 동적 import로 순환 참조 방지하면서 모든 스토어 가져오기
+      const [{ useBookStore }, { useThreadStore }, { useCategoryStore }] = await Promise.all([
+        import('@/stores/books'),
+        import('@/stores/thread'),
+        import('@/stores/category'),
+      ])
+
+      // 각 스토어의 reset 메서드 호출 (있는 경우에만)
+      const bookStore = useBookStore()
+      const threadStore = useThreadStore()
+      const categoryStore = useCategoryStore()
+
+      // 스토어별 reset 메서드 호출
+      if (typeof bookStore.reset === 'function') {
+        bookStore.reset()
+        console.log('✅ [useAuth] BookStore 초기화 완료')
+      }
+
+      if (typeof threadStore.reset === 'function') {
+        threadStore.reset()
+        console.log('✅ [useAuth] ThreadStore 초기화 완료')
+      }
+
+      // CategoryStore는 정적 데이터이므로 초기화하지 않음
+
+      // Auth 스토어는 마지막에 초기화
+      await authStore.resetAuth()
+      console.log('✅ [useAuth] AuthStore 초기화 완료')
+
+      console.log('✅ [useAuth] 모든 Pinia 스토어 초기화 완료')
+    } catch (error) {
+      console.error('❌ [useAuth] 스토어 초기화 중 오류:', error)
+      // 오류가 발생해도 최소한 auth 스토어는 초기화
+      await authStore.resetAuth()
+    }
   }
 
   /**
@@ -50,6 +95,14 @@ export function useAuth() {
       // 방문 기록 설정 (새로고침 시 silent refresh 활성화)
       sessionStorage.setItem('gobooky-visited', 'true')
 
+      // 로그인 후 쿠키 확인 (디버깅용)
+      console.log('🍪 [useAuth] 로그인 후 쿠키 확인:', document.cookie)
+
+      // HttpOnly 쿠키는 JavaScript로 읽을 수 없으므로 간접 확인
+      setTimeout(() => {
+        console.log('🍪 [useAuth] 1초 후 쿠키 재확인:', document.cookie)
+      }, 1000)
+
       console.log('✅ [useAuth] 로그인 성공:', response.user.email)
       return true
     } catch (err) {
@@ -71,7 +124,7 @@ export function useAuth() {
   }
 
   /**
-   * 로그아웃
+   * 로그아웃 (지침에 따른 모든 Pinia 스토어 초기화 포함)
    * @returns {Promise<boolean>} 성공 여부
    */
   const logout = async () => {
@@ -84,14 +137,11 @@ export function useAuth() {
       // 서버에 로그아웃 요청
       await authAPI.logout()
 
-      // 스토어 초기화
-      await authStore.resetAuth()
+      // 지침에 따른 모든 Pinia 스토어 초기화
+      await resetAllStores()
 
       // 방문 기록 제거 (다음 접속 시 첫 방문으로 처리)
       sessionStorage.removeItem('gobooky-visited')
-
-      // 로그인 페이지로 리다이렉트
-      await router.push('/login')
 
       console.log('✅ [useAuth] 로그아웃 성공')
       return true
@@ -99,12 +149,10 @@ export function useAuth() {
       console.error('❌ [useAuth] 로그아웃 실패:', err)
 
       // 로그아웃 실패해도 클라이언트 상태는 초기화
-      await authStore.resetAuth()
+      await resetAllStores()
 
       // 방문 기록 제거 (다음 접속 시 첫 방문으로 처리)
       sessionStorage.removeItem('gobooky-visited')
-
-      await router.push('/login')
 
       error.value = '로그아웃 중 오류가 발생했습니다.'
       return false
@@ -265,5 +313,6 @@ export function useAuth() {
     verifyEmail,
     completeProfile,
     clearError,
+    resetAllStores,
   }
 }

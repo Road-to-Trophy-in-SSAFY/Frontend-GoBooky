@@ -31,7 +31,10 @@ export const useThreadStore = defineStore(
     const hasThreads = computed(() => threads.value.length > 0)
 
     const getThreadById = computed(() => {
-      return (id) => threads.value.find((thread) => thread.id === parseInt(id))
+      return (id) => {
+        const numericId = parseInt(id)
+        return threads.value.find((thread) => thread.id === numericId)
+      }
     })
 
     const filteredThreads = computed(() => {
@@ -107,17 +110,18 @@ export const useThreadStore = defineStore(
      * @param {Object} updatedThread 업데이트된 쓰레드 데이터
      */
     function updateThread(threadId, updatedThread) {
-      const index = threads.value.findIndex((thread) => thread.id === threadId)
+      const numericThreadId = parseInt(threadId)
+      const index = threads.value.findIndex((thread) => thread.id === numericThreadId)
       if (index !== -1) {
         threads.value[index] = updatedThread
       }
 
       // 상세 페이지 데이터도 업데이트
-      if (threadDetail.value?.id === threadId) {
+      if (threadDetail.value?.id === numericThreadId) {
         threadDetail.value = updatedThread
       }
 
-      console.log('✅ [ThreadStore] 쓰레드 업데이트 완료:', threadId)
+      console.log('✅ [ThreadStore] 쓰레드 업데이트 완료:', numericThreadId)
     }
 
     /**
@@ -125,37 +129,47 @@ export const useThreadStore = defineStore(
      * @param {number} threadId 쓰레드 ID
      */
     function removeThread(threadId) {
-      threads.value = threads.value.filter((thread) => thread.id !== threadId)
+      const numericThreadId = parseInt(threadId)
+      threads.value = threads.value.filter((thread) => thread.id !== numericThreadId)
 
       // 상세 페이지 데이터도 초기화
-      if (threadDetail.value?.id === threadId) {
+      if (threadDetail.value?.id === numericThreadId) {
         threadDetail.value = null
       }
 
-      console.log('✅ [ThreadStore] 쓰레드 삭제 완료:', threadId)
+      console.log('✅ [ThreadStore] 쓰레드 삭제 완료:', numericThreadId)
     }
 
     /**
-     * 쓰레드 좋아요 상태 업데이트
+     * 쓰레드 좋아요 상태 업데이트 (Optimistic UI 지원)
      * @param {number} threadId 쓰레드 ID
      * @param {boolean} liked 좋아요 상태
      * @param {number} likesCount 좋아요 수
      */
     function updateThreadLike(threadId, liked, likesCount) {
-      // 목록에서 업데이트
-      const threadIndex = threads.value.findIndex((thread) => thread.id === threadId)
+      // 🔧 타입 안전성 보장
+      const numericThreadId = parseInt(threadId)
+      if (!numericThreadId || isNaN(numericThreadId)) {
+        console.error('❌ [ThreadStore] 유효하지 않은 쓰레드 ID:', threadId)
+        return
+      }
+
+      // 목록에서 업데이트 (타입 안전한 비교)
+      const threadIndex = threads.value.findIndex((thread) => thread.id === numericThreadId)
       if (threadIndex !== -1) {
         threads.value[threadIndex].liked = liked
         threads.value[threadIndex].likes_count = likesCount
+        console.log('🔄 [ThreadStore] 목록에서 좋아요 상태 업데이트:', numericThreadId, liked)
       }
 
-      // 상세 페이지에서도 업데이트
-      if (threadDetail.value?.id === threadId) {
+      // 상세 페이지에서도 업데이트 (타입 안전한 비교)
+      if (threadDetail.value?.id === numericThreadId) {
         threadDetail.value.liked = liked
         threadDetail.value.likes_count = likesCount
+        console.log('🔄 [ThreadStore] 상세에서 좋아요 상태 업데이트:', numericThreadId, liked)
       }
 
-      console.log('✅ [ThreadStore] 쓰레드 좋아요 상태 업데이트:', threadId, liked)
+      console.log('✅ [ThreadStore] 쓰레드 좋아요 상태 업데이트 완료:', numericThreadId, liked)
     }
 
     /**

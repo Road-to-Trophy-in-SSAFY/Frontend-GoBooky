@@ -128,6 +128,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       // 첫 접속인지 확인 (sessionStorage 활용)
       const hasVisited = sessionStorage.getItem('gobooky-visited')
+      console.log('🔍 [AuthStore] sessionStorage 확인:', { hasVisited })
 
       if (!hasVisited) {
         // 첫 접속 - API 호출 없이 게스트 모드
@@ -160,18 +161,40 @@ export const useAuthStore = defineStore('auth', () => {
    */
   async function silentRefresh() {
     try {
+      console.log('🔄 [AuthStore] Silent refresh 시작')
+
+      // 쿠키 확인 (디버깅용)
+      console.log('🍪 [AuthStore] 현재 쿠키:', document.cookie)
+
       // 동적 import로 순환 참조 방지
       const { authAPI } = await import('@/api/auth')
+      console.log('📡 [AuthStore] authAPI import 완료, refresh 요청 시작')
+
       const response = await authAPI.refreshToken()
+      console.log('✅ [AuthStore] Silent refresh 응답 받음:', response)
 
       // 새 토큰과 사용자 정보 저장
       setAuth(response.access, response.user)
+      console.log('✅ [AuthStore] Silent refresh 성공 - 토큰 저장 완료')
       return true
     } catch (error) {
+      console.error('❌ [AuthStore] Silent refresh 실패 상세:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: error.config?.headers,
+        withCredentials: error.config?.withCredentials,
+      })
+
       // Silent refresh는 실패해도 에러 로그를 출력하지 않음
       // 401 에러는 정상적인 상황 (쿠키 없음 또는 만료)
       if (error.response?.status !== 401) {
         console.error('❌ [AuthStore] Silent refresh 예상치 못한 오류:', error)
+      } else {
+        console.log('ℹ️ [AuthStore] Silent refresh 401 - Refresh token 없음/만료')
       }
       resetAuth()
       return false
