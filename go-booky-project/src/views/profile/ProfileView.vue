@@ -10,9 +10,10 @@
     <div v-else-if="profile" class="profile-details">
       <div class="profile-header">
         <img
-          :src="profile.profile_picture_url || '/media/profile_pictures/default-profile.jpg'"
+          :src="getProfileImageUrl(profile.profile_picture_url)"
           alt="프로필 사진"
           class="profile-picture"
+          @error="handleImageError"
         />
         <div class="profile-header-info">
           <h3>{{ profile.username }}</h3>
@@ -122,6 +123,7 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import Modal from '@/components/ui/Modal.vue'
 import { useAuthStore } from '@/stores/auth'
+import { getProfileImageUrl, handleImageError } from '@/utils/images'
 
 const route = useRoute()
 const router = useRouter()
