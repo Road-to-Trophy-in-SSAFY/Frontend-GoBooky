@@ -189,7 +189,7 @@
 <script setup>
 import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 
-const props = defineProps({
+defineProps({
   isLoading: {
     type: Boolean,
     default: false,
