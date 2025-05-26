@@ -9,7 +9,7 @@ import axios from 'axios'
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000',
   withCredentials: true, // HttpOnly 쿠키 전송을 위해 필요
-  timeout: 10000, // 10초 타임아웃
+  timeout: 60000, // 60초 타임아웃 (이미지 생성을 위해 증가)
 })
 
 // 토큰 갱신 중인지 확인하는 플래그

@@ -5,7 +5,17 @@
 
     <!-- 쓰레드 이미지 표시 -->
     <div class="thread-image">
-      <img :src="threadImage" alt="쓰레드 이미지" class="cover-image" />
+      <img
+        v-if="threadImage !== '/logo.png'"
+        :src="threadImage"
+        alt="쓰레드 이미지"
+        class="cover-image"
+        @error="handleImageError"
+      />
+      <div v-else class="image-placeholder">
+        <div class="loading-spinner"></div>
+        <p>이미지 생성 중...</p>
+      </div>
     </div>
 
     <p>책: {{ thread.book.title }}</p>
@@ -117,17 +127,29 @@ const API_URL = 'http://127.0.0.1:8000'
 
 // 쓰레드 이미지 계산
 const threadImage = computed(() => {
-  if (thread.value && thread.value.cover_img_url) {
-    return thread.value.cover_img_url
-  }
-  if (thread.value && thread.value.cover_img) {
-    // 절대 경로인지 확인
-    if (thread.value.cover_img.startsWith('http')) {
-      return thread.value.cover_img
+  if (thread.value) {
+    // 1. cover_img_url이 있으면 우선 사용 (백엔드에서 제공하는 완전한 URL)
+    if (thread.value.cover_img_url) {
+      console.log('🖼️ [ThreadDetailView] cover_img_url 사용:', thread.value.cover_img_url)
+      return thread.value.cover_img_url
     }
-    return `${API_URL}/media/${thread.value.cover_img}`
+
+    // 2. cover_img 필드가 있으면 사용
+    if (thread.value.cover_img) {
+      // 절대 경로인지 확인
+      if (thread.value.cover_img.startsWith('http')) {
+        console.log('🖼️ [ThreadDetailView] 절대 경로 cover_img 사용:', thread.value.cover_img)
+        return thread.value.cover_img
+      }
+      // 상대 경로면 API URL과 결합
+      const imageUrl = `${API_URL}/media/${thread.value.cover_img}`
+      console.log('🖼️ [ThreadDetailView] 상대 경로 cover_img 사용:', imageUrl)
+      return imageUrl
+    }
   }
+
   // 기본 이미지 사용
+  console.log('🖼️ [ThreadDetailView] 기본 이미지 사용')
   return '/logo.png'
 })
 
@@ -143,18 +165,6 @@ const editorOptions = {
   },
   placeholder: '내용을 입력하세요',
 }
-
-onMounted(async () => {
-  // 컴포넌트 마운트 시 ID 유효성 검사
-  const threadId = route.params.id
-  if (!threadId || threadId === 'undefined') {
-    console.error('유효하지 않은 쓰레드 ID:', threadId)
-    router.push({ name: 'threads' }) // 유효하지 않은 ID인 경우 목록 페이지로 리다이렉트
-    return
-  }
-
-  await loadThread()
-})
 
 const loadThread = async () => {
   try {
@@ -230,6 +240,49 @@ const handleLikeThread = async () => {
     console.error('❌ [ThreadDetailView] 좋아요 처리 실패:', error)
   }
 }
+
+const handleImageError = () => {
+  console.log('🖼️ [ThreadDetailView] 이미지 로드 실패 - 기본 이미지 사용')
+}
+
+// 이미지가 없는 경우 주기적으로 쓰레드 정보 새로고침
+let imageCheckInterval = null
+
+onMounted(async () => {
+  // 컴포넌트 마운트 시 ID 유효성 검사
+  const threadId = route.params.id
+  if (!threadId || threadId === 'undefined') {
+    console.error('유효하지 않은 쓰레드 ID:', threadId)
+    router.push({ name: 'threads' }) // 유효하지 않은 ID인 경우 목록 페이지로 리다이렉트
+    return
+  }
+
+  await loadThread()
+
+  // 이미지가 없으면 주기적으로 확인
+  if (!thread.value?.cover_img_url && !thread.value?.cover_img) {
+    console.log('🔄 [ThreadDetailView] 이미지 생성 대기 중 - 주기적 확인 시작')
+    imageCheckInterval = setInterval(async () => {
+      try {
+        await fetchThread(threadId)
+        if (thread.value?.cover_img_url || thread.value?.cover_img) {
+          console.log('✅ [ThreadDetailView] 이미지 생성 완료 - 주기적 확인 중단')
+          clearInterval(imageCheckInterval)
+        }
+      } catch (error) {
+        console.error('❌ [ThreadDetailView] 이미지 확인 실패:', error)
+      }
+    }, 3000) // 3초마다 확인
+  }
+})
+
+// 컴포넌트 언마운트 시 인터벌 정리
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  if (imageCheckInterval) {
+    clearInterval(imageCheckInterval)
+  }
+})
 </script>
 
 <style scoped>
@@ -249,6 +302,36 @@ const handleLikeThread = async () => {
   max-height: 400px;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 2px dashed #dee2e6;
+}
+
+.loading-spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4caf50;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 2s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .content {
