@@ -1,6 +1,6 @@
 <template>
   <div class="modal-backdrop" @click.self="$emit('close')">
-    <div class="modal-content">
+    <div class="modal-content" :class="$attrs.class">
       <slot v-if="$slots.default" />
       <template v-else>
         {{ text }}
@@ -11,7 +11,10 @@
 </template>
 
 <script setup>
-defineOptions({ name: 'BaseModal' })
+defineOptions({
+  name: 'BaseModal',
+  inheritAttrs: false,
+})
 defineProps({ text: String })
 </script>
 

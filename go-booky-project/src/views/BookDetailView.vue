@@ -326,14 +326,15 @@
             </div>
             <div class="editor-wrapper">
               <QuillEditor
+                ref="quillEditor"
                 v-model:content="threadForm.content"
                 contentType="html"
                 theme="snow"
                 toolbar="essential"
                 :options="editorOptions"
                 class="editor-container"
-                @focus="currentStep = 3"
-                @blur="currentStep = 0"
+                @focus="handleEditorFocus"
+                @blur="handleEditorBlur"
               />
               <div class="editor-footer">
                 <div class="editor-tips">
@@ -548,6 +549,42 @@ const editorOptions = {
     '이 책을 읽고 느낀 점을 자유롭게 작성해보세요... (AI 이미지 생성을 위해 구체적인 장면이나 감정을 포함해주세요)',
 }
 
+// Quill Editor 인스턴스 참조
+const quillEditor = ref(null)
+const isEditorFocused = ref(false)
+
+// 에디터 포커스 핸들러
+const handleEditorFocus = () => {
+  isEditorFocused.value = true
+  currentStep.value = 3
+
+  // 포커스 시 placeholder 숨기기
+  if (quillEditor.value && quillEditor.value.getQuill) {
+    const quill = quillEditor.value.getQuill()
+    const editor = quill.root
+    if (editor) {
+      editor.setAttribute('data-placeholder', '')
+    }
+  }
+}
+
+// 에디터 블러 핸들러
+const handleEditorBlur = () => {
+  isEditorFocused.value = false
+  currentStep.value = 0
+
+  // 블러 시 내용이 없으면 placeholder 복원
+  if (quillEditor.value && quillEditor.value.getQuill) {
+    const quill = quillEditor.value.getQuill()
+    const editor = quill.root
+    const isEmpty = quill.getText().trim() === ''
+
+    if (editor && isEmpty) {
+      editor.setAttribute('data-placeholder', editorOptions.placeholder)
+    }
+  }
+}
+
 // 로그인 페이지로 이동
 const goToLogin = () => {
   router.push({ name: 'Login' })
@@ -636,6 +673,21 @@ const handleThreadWriteClick = () => {
   }
   // 로그인된 상태일 때만 모달 표시
   showWriteModal.value = true
+
+  // 모달이 열릴 때 에디터 상태 초기화
+  setTimeout(() => {
+    if (quillEditor.value && quillEditor.value.getQuill) {
+      const quill = quillEditor.value.getQuill()
+      const editor = quill.root
+      if (editor) {
+        // 내용이 비어있으면 placeholder 복원
+        const isEmpty = quill.getText().trim() === ''
+        if (isEmpty) {
+          editor.setAttribute('data-placeholder', editorOptions.placeholder)
+        }
+      }
+    }
+  }, 100)
 }
 
 // 라우트 파라미터가 변경될 때마다 책 정보를 다시 불러옴
@@ -648,6 +700,29 @@ watch(
     }
   },
 )
+
+// 모달 상태 변경 감지
+watch(showWriteModal, (isOpen) => {
+  if (!isOpen) {
+    // 모달이 닫힐 때 에디터 상태 리셋
+    isEditorFocused.value = false
+    currentStep.value = 0
+
+    // 에디터 placeholder 복원
+    setTimeout(() => {
+      if (quillEditor.value && quillEditor.value.getQuill) {
+        const quill = quillEditor.value.getQuill()
+        const editor = quill.root
+        if (editor) {
+          const isEmpty = quill.getText().trim() === ''
+          if (isEmpty) {
+            editor.setAttribute('data-placeholder', editorOptions.placeholder)
+          }
+        }
+      }
+    }, 100)
+  }
+})
 
 onMounted(() => {
   loadBookData(route.params.id)
@@ -2130,6 +2205,26 @@ const submitThread = async () => {
 .editor-container .ql-toolbar {
   border-bottom: 1px solid #e5e7eb;
   padding: 12px 16px;
+}
+
+/* Placeholder 커스텀 스타일 */
+.editor-container .ql-editor.ql-blank::before {
+  color: #9ca3af !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  opacity: 1 !important;
+  transition: opacity 0.2s ease !important;
+}
+
+/* 포커스 시 placeholder 숨기기 */
+.editor-container .ql-editor:focus.ql-blank::before {
+  opacity: 0 !important;
+}
+
+/* 에디터가 포커스되었을 때 placeholder 완전히 숨기기 */
+.editor-container .ql-editor[data-placeholder='']::before {
+  content: '' !important;
+  opacity: 0 !important;
 }
 
 /* 태블릿 반응형 */

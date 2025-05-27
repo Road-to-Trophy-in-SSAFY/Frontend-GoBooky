@@ -59,13 +59,19 @@
     </section>
 
     <!-- Recommended Threads List -->
-    <section class="recommended-threads">
-      <h2>추천 글</h2>
+    <section class="recommended-threads" data-aos="fade-up">
+      <h2 data-aos="fade-down">추천 글</h2>
       <div v-if="isThreadLoading" class="loading">
         <p>쓰레드를 불러오는 중...</p>
       </div>
       <ul v-else-if="threads.length > 0">
-        <li v-for="thread in threads" :key="thread.id" @click="goToThreadDetail(thread.id)">
+        <li
+          v-for="thread in threads"
+          :key="thread.id"
+          @click="goToThreadDetail(thread.id)"
+          data-aos="slide-up"
+          :data-aos-delay="thread.id * 100"
+        >
           <div class="thread-item">
             <div class="thread-header">
               <h3 class="thread-title">{{ thread.title }}</h3>
@@ -90,7 +96,8 @@ import { Navigation } from 'swiper/modules'
 import 'swiper/css'
 import 'swiper/css/navigation'
 import { gsap } from 'gsap'
-import skrollr from 'skrollr'
+import AOS from 'aos'
+import 'aos/dist/aos.css'
 import { booksAPI } from '@/api/books'
 import { threadsAPI } from '@/api/threads'
 
@@ -264,7 +271,12 @@ onMounted(async () => {
     })
   }
 
-  skrollr.init()
+  // AOS 초기화
+  AOS.init({
+    duration: 1000,
+    once: true,
+    offset: 100,
+  })
 
   // 로고 애니메이션 향상 - 더 빠른 시작
   gsap.to('.cover-logo', {

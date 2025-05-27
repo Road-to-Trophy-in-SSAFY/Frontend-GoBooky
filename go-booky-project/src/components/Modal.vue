@@ -13,7 +13,7 @@
         :aria-labelledby="title ? 'modal-title' : undefined"
       >
         <div class="modal-container">
-          <div class="modal-content" @click.stop>
+          <div class="modal-content" @click.stop :class="$attrs.class">
             <div class="modal-header">
               <h3 v-if="title" id="modal-title" class="modal-title">{{ title }}</h3>
               <button
@@ -53,10 +53,11 @@
 </template>
 
 <script setup>
-import { watch, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { watch, nextTick, onMounted, onUnmounted } from 'vue'
 
 defineOptions({
   name: 'BaseModal',
+  inheritAttrs: false,
 })
 
 const props = defineProps({
