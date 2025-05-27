@@ -15,7 +15,7 @@ export const profileAPI = {
    * @returns {Promise} 저장된 도서 목록
    */
   async getUserBooks(username, params = {}) {
-    const response = await api.get(`/auth/profile/${username}/books/`, { params })
+    const response = await api.get(`/auth/auth/profile/${username}/books/`, { params })
     return response.data
   },
 
@@ -25,7 +25,7 @@ export const profileAPI = {
    * @returns {Promise} 저장 상태
    */
   async toggleBookSave(bookId) {
-    const response = await api.post(`/auth/books/${bookId}/save/`)
+    const response = await api.post(`/auth/auth/books/${bookId}/save/`)
     return response.data
   },
 
@@ -36,7 +36,7 @@ export const profileAPI = {
    * @returns {Promise} 댓글 목록
    */
   async getUserComments(username, params = {}) {
-    const response = await api.get(`/auth/profile/${username}/comments/`, { params })
+    const response = await api.get(`/auth/auth/profile/${username}/comments/`, { params })
     return response.data
   },
 
@@ -47,27 +47,32 @@ export const profileAPI = {
    * @returns {Promise} 쓰레드 목록
    */
   async getUserThreads(username, params = {}) {
-    const response = await api.get(`/auth/profile/${username}/threads/`, { params })
+    const response = await api.get(`/auth/auth/profile/${username}/threads/`, { params })
     return response.data
   },
 
   /**
    * 댓글 삭제
+   * @param {number} threadId 쓰레드 ID
    * @param {number} commentId 댓글 ID
    * @returns {Promise} 삭제 결과
    */
-  async deleteComment(commentId) {
-    const response = await api.delete(`/threads/comments/${commentId}/`)
+  async deleteComment(threadId, commentId) {
+    const response = await api.delete(`/api/threads/${threadId}/comments/${commentId}/`)
     return response.data
   },
 
   /**
    * 대댓글 삭제
+   * @param {number} threadId 쓰레드 ID
+   * @param {number} commentId 댓글 ID
    * @param {number} replyId 대댓글 ID
    * @returns {Promise} 삭제 결과
    */
-  async deleteReply(replyId) {
-    const response = await api.delete(`/threads/replies/${replyId}/`)
+  async deleteReply(threadId, commentId, replyId) {
+    const response = await api.delete(
+      `/api/threads/${threadId}/comments/${commentId}/replies/${replyId}/`,
+    )
     return response.data
   },
 
@@ -77,7 +82,7 @@ export const profileAPI = {
    * @returns {Promise} 삭제 결과
    */
   async deleteThread(threadId) {
-    const response = await api.delete(`/threads/threads/${threadId}/`)
+    const response = await api.delete(`/api/threads/${threadId}/`)
     return response.data
   },
 }

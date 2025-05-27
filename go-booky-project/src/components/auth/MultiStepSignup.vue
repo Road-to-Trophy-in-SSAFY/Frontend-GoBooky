@@ -854,7 +854,7 @@ watch(
   font-size: 0.875rem;
   min-height: 120px;
   padding: 0.5rem;
-  background-color: #f8fafc;
+  /* background-color: #f8fafc; */
   border-radius: 8px;
 }
 
@@ -879,7 +879,7 @@ watch(
   min-height: 24px;
   margin-top: 0.75rem;
   padding: 0.5rem;
-  background-color: #f8fafc;
+  /* background-color: #f8fafc; */
   border-radius: 8px;
 }
 
@@ -1283,7 +1283,7 @@ watch(
 }
 
 .actions {
-  margin-top: 2rem;
+  margin-top: 1rem;
 }
 
 .spinner,
