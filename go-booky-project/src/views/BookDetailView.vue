@@ -150,14 +150,15 @@
         <div class="book-info-section">
           <div class="book-meta">
             <h1 class="book-title">{{ book.title }}</h1>
-          </div>
 
-          <div v-if="book.description" class="book-description">
-            <h3 class="description-title">
-              <span class="description-icon">📖</span>
-              책 소개
-            </h3>
-            <p class="description-text">{{ book.description }}</p>
+            <!-- 책 설명을 제목 바로 아래로 이동 -->
+            <div v-if="book.description" class="book-description">
+              <h3 class="description-title">
+                <span class="description-icon">📖</span>
+                책 소개
+              </h3>
+              <p class="description-text">{{ book.description }}</p>
+            </div>
           </div>
 
           <!-- 오디오북 섹션 -->
@@ -951,13 +952,13 @@ const submitThread = async () => {
 .book-info-section {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 24px;
 }
 
 .book-meta {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
 }
 
 .book-title {
@@ -1128,10 +1129,11 @@ const submitThread = async () => {
 /* 책 설명 스타일 */
 .book-description {
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-radius: 20px;
-  padding: 32px;
+  border-radius: 16px;
+  padding: 24px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  margin-top: 8px;
 }
 
 /* 오디오북 섹션 스타일 */
@@ -1911,7 +1913,12 @@ const submitThread = async () => {
 
   .audiobook-section {
     padding: 24px;
-    margin-top: 20px;
+    margin-top: 16px;
+  }
+
+  .book-description {
+    padding: 20px;
+    margin-top: 12px;
   }
 
   .audiobook-title {
@@ -1981,6 +1988,11 @@ const submitThread = async () => {
   .audiobook-section {
     padding: 20px;
     margin-top: 16px;
+  }
+
+  .book-description {
+    padding: 16px;
+    margin-top: 8px;
   }
 
   .audiobook-title {
