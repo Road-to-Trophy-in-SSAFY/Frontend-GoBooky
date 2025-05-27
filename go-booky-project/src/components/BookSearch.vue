@@ -85,10 +85,13 @@
         <div class="search-term-display">
           <span class="search-icon-small">🔍</span>
           <span class="search-term">"{{ bookStore.filters.search }}"</span>
+          <span v-if="selectedCategoryName" class="category-filter-display">
+            "{{ selectedCategoryName }}" 카테고리 내
+          </span>
           <span class="search-label">검색 결과</span>
         </div>
         <div class="result-count">
-          <span class="count-number">{{ bookStore.filteredBooks.length }}</span>
+          <span class="count-number">{{ totalResultCount }}</span>
           <span class="count-label">권의 도서</span>
         </div>
       </div>
@@ -130,18 +133,36 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, inject } from 'vue'
 import { useBookStore } from '@/stores/books'
+import { useCategoryStore } from '@/stores/category'
+import { useRouter, useRoute } from 'vue-router'
 
 const bookStore = useBookStore()
+const categoryStore = useCategoryStore()
+const router = useRouter()
+const route = useRoute()
 const searchQuery = ref('')
 const isSearching = ref(false)
 const showSuggestions = ref(false)
 const searchSuggestions = ref([])
 
+// 전체 결과 개수 (페이지네이션 정보에서 가져옴)
+const totalResultCount = inject(
+  'totalResultCount',
+  computed(() => bookStore.pagination.totalCount || 0),
+)
+
 // 검색 모드 여부 확인
 const isSearchMode = computed(() => {
   return bookStore.filters.search && bookStore.filters.search.trim() !== ''
+})
+
+// 선택된 카테고리 이름
+const selectedCategoryName = computed(() => {
+  if (!bookStore.filters.category) return null
+  const category = categoryStore.categories.find((cat) => cat.pk === bookStore.filters.category)
+  return category ? category.fields.name : null
 })
 
 /**
@@ -176,10 +197,18 @@ const handleSearch = async () => {
   showSuggestions.value = false
 
   try {
-    // 검색 시 카테고리 필터 초기화 (전체 도서에서 검색)
+    // 검색 시 카테고리 필터 초기화하고 페이지를 1로 리셋
     bookStore.setFilters({
       search: query,
       category: null,
+    })
+
+    // URL 업데이트 (페이지를 1로 리셋)
+    await router.push({
+      query: {
+        search: query,
+        page: '1',
+      },
     })
 
     console.log('✅ [BookSearch] 검색 필터 적용 완료')
@@ -193,7 +222,7 @@ const handleSearch = async () => {
 /**
  * 검색 초기화 (전체 도서 목록 보기)
  */
-const clearSearch = () => {
+const clearSearch = async () => {
   console.log('🔄 [BookSearch] 검색 초기화')
 
   searchQuery.value = ''
@@ -202,6 +231,14 @@ const clearSearch = () => {
     search: '',
     category: null,
   })
+
+  // URL에서 검색 관련 파라미터 제거
+  const newQuery = { ...route.query }
+  delete newQuery.search
+  delete newQuery.category
+  newQuery.page = '1'
+
+  await router.push({ query: newQuery })
 
   console.log('✅ [BookSearch] 전체 도서 목록으로 복원')
 }
@@ -217,6 +254,11 @@ const applySuggestion = (suggestion) => {
 // 컴포넌트 마운트 시 기존 검색어가 있으면 input에 설정
 if (bookStore.filters.search) {
   searchQuery.value = bookStore.filters.search
+}
+
+// URL에서 검색어 읽어오기
+if (route.query.search) {
+  searchQuery.value = route.query.search
 }
 </script>
 
@@ -399,6 +441,16 @@ if (bookStore.filters.search) {
 .search-label {
   color: #0369a1;
   font-weight: 500;
+}
+
+.category-filter-display {
+  font-weight: 600;
+  color: #3b82f6;
+  font-size: 14px;
+  background: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #bae6fd;
 }
 
 .result-count {

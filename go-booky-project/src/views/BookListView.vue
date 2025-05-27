@@ -28,11 +28,7 @@
 
           <!-- 책 목록 with 애니메이션 -->
           <Transition name="book-list" mode="out-in">
-            <BookList
-              :key="pagination.page"
-              :books="bookStore.filteredBooks"
-              class="book-list-animated"
-            />
+            <BookList :key="pagination.page" :books="books" class="book-list-animated" />
           </Transition>
 
           <!-- 페이지네이션 -->
@@ -101,7 +97,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBookStore } from '@/stores/books.js'
 import BookList from '@/components/BookList.vue'
@@ -156,6 +152,12 @@ const visiblePages = computed(() => {
   return pages
 })
 
+// 전체 결과 개수를 하위 컴포넌트에 제공
+provide(
+  'totalResultCount',
+  computed(() => pagination.value.totalCount),
+)
+
 // 도서 목록 로드
 const loadBooks = async (page = 1) => {
   try {
@@ -169,20 +171,19 @@ const loadBooks = async (page = 1) => {
     })
 
     // 현재 필터 상태에 따라 적절한 API 호출
-    let response
     const params = { page }
 
-    // 카테고리 필터가 있는 경우
-    if (bookStore.filters.category) {
+    // 카테고리 필터가 있는 경우 (null이 아니고 'null' 문자열도 아닌 경우)
+    if (bookStore.filters.category && bookStore.filters.category !== 'null') {
       params.category = bookStore.filters.category
     }
 
     // 검색어가 있는 경우
-    if (bookStore.filters.search) {
-      params.search = bookStore.filters.search
+    if (bookStore.filters.search && bookStore.filters.search.trim()) {
+      params.search = bookStore.filters.search.trim()
     }
 
-    response = await fetchBooks(params)
+    const response = await fetchBooks(params)
 
     // 응답 구조 확인 및 처리
     if (response.results) {
@@ -196,14 +197,24 @@ const loadBooks = async (page = 1) => {
         hasPrevious: !!response.previous,
       }
       bookStore.setBooks(response.results)
+      bookStore.setPagination(pagination.value)
     } else {
       // 일반 배열 응답
       books.value = response
+      pagination.value = {
+        page: 1,
+        totalPages: 1,
+        totalCount: response.length,
+        hasNext: false,
+        hasPrevious: false,
+      }
       bookStore.setBooks(response)
+      bookStore.setPagination(pagination.value)
     }
 
     console.log('✅ [BookListView] 도서 목록 로드 완료:', {
       count: books.value.length,
+      totalCount: pagination.value.totalCount,
       pagination: pagination.value,
       appliedFilters: { category: bookStore.filters.category, search: bookStore.filters.search },
     })
@@ -221,7 +232,8 @@ const loadBooks = async (page = 1) => {
     if (pagination.value.hasNext) {
       setTimeout(async () => {
         try {
-          const nextPageResponse = await fetchBooks({ page: page + 1 })
+          const nextPageParams = { ...params, page: page + 1 }
+          const nextPageResponse = await fetchBooks(nextPageParams)
           if (nextPageResponse.results) {
             const nextPageImages = nextPageResponse.results
               .map((book) => book.cover)
@@ -250,8 +262,15 @@ const loadBooks = async (page = 1) => {
 // 페이지 이동
 const goToPage = async (page) => {
   if (page < 1 || page > pagination.value.totalPages || loading.value) {
+    console.log('❌ [BookListView] 잘못된 페이지 이동 시도:', {
+      page,
+      totalPages: pagination.value.totalPages,
+      loading: loading.value,
+    })
     return
   }
+
+  console.log('📄 [BookListView] 페이지 이동:', page)
 
   // URL 업데이트
   await router.push({
@@ -265,20 +284,23 @@ watch(
   (newQuery, oldQuery) => {
     const newPage = parseInt(newQuery.page) || 1
     const newCategory = newQuery.category ? parseInt(newQuery.category) : null
+    const newSearch = newQuery.search || ''
 
-    // 스토어의 카테고리 필터 업데이트
-    if (newCategory !== bookStore.filters.category) {
+    // 스토어의 필터 업데이트
+    const currentFilters = bookStore.filters
+    if (newCategory !== currentFilters.category || newSearch !== currentFilters.search) {
       bookStore.setFilters({
         category: newCategory,
-        search: bookStore.filters.search, // 검색어는 유지
+        search: newSearch,
       })
     }
 
-    // 페이지가 변경되었거나 카테고리가 변경된 경우 데이터 로드
-    if (
-      newPage !== pagination.value.page ||
-      newCategory !== (oldQuery?.category ? parseInt(oldQuery.category) : null)
-    ) {
+    // 페이지, 카테고리, 검색어 중 하나라도 변경된 경우 데이터 로드
+    const oldPage = parseInt(oldQuery?.page) || 1
+    const oldCategory = oldQuery?.category ? parseInt(oldQuery.category) : null
+    const oldSearch = oldQuery?.search || ''
+
+    if (newPage !== oldPage || newCategory !== oldCategory || newSearch !== oldSearch) {
       loadBooks(newPage)
     }
   },
@@ -287,14 +309,14 @@ watch(
 
 // 컴포넌트 마운트 시 초기 로드
 onMounted(() => {
-  // URL에서 카테고리 파라미터 읽어서 스토어에 설정
+  // URL에서 파라미터 읽어서 스토어에 설정
   const categoryFromUrl = route.query.category ? parseInt(route.query.category) : null
-  if (categoryFromUrl !== bookStore.filters.category) {
-    bookStore.setFilters({
-      category: categoryFromUrl,
-      search: bookStore.filters.search, // 검색어는 유지
-    })
-  }
+  const searchFromUrl = route.query.search || ''
+
+  bookStore.setFilters({
+    category: categoryFromUrl,
+    search: searchFromUrl,
+  })
 
   loadBooks(currentPage.value)
 })

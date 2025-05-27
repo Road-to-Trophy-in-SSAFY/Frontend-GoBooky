@@ -80,7 +80,7 @@ async function selectCategory(pk) {
       search: bookStore.filters.search, // 검색어는 유지
     })
 
-    // URL 업데이트 (페이지를 1로 리셋)
+    // URL 업데이트 (페이지를 1로 리셋, 검색어는 유지)
     const newQuery = { ...route.query }
 
     if (pk === null) {
@@ -91,8 +91,13 @@ async function selectCategory(pk) {
       newQuery.category = pk
     }
 
-    // 페이지를 1로 리셋
-    newQuery.page = '1'
+    // 페이지를 1로 리셋 (검색어가 있을 때만)
+    if (bookStore.filters.search) {
+      newQuery.page = '1'
+    } else {
+      // 검색어가 없으면 페이지도 1로 리셋
+      newQuery.page = '1'
+    }
 
     // 라우터로 URL 업데이트 (이렇게 하면 BookListView의 watch가 트리거됨)
     await router.push({
@@ -101,6 +106,7 @@ async function selectCategory(pk) {
 
     console.log('✅ [CategoryList] 카테고리 선택 및 URL 업데이트 완료:', {
       category: pk,
+      search: bookStore.filters.search,
       newQuery,
     })
   } catch (error) {
