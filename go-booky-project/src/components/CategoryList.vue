@@ -35,7 +35,6 @@
 import { useCategoryStore } from '@/stores/category.js'
 import { computed } from 'vue'
 import { useBookStore } from '@/stores/books.js'
-import { useBooks } from '@/composables/useBooks'
 import { useRouter, useRoute } from 'vue-router'
 
 defineOptions({
@@ -45,7 +44,6 @@ defineOptions({
 const categoryStore = useCategoryStore()
 const categories = computed(() => categoryStore.categories)
 const bookStore = useBookStore()
-const { fetchBooksByCategory, fetchBooks } = useBooks()
 const router = useRouter()
 const route = useRoute()
 

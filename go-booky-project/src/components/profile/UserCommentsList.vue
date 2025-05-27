@@ -56,7 +56,11 @@
 
           <!-- 쓰레드 정보 -->
           <div class="thread-info">
-            <router-link :to="`/threads/${comment.thread_id}`" class="thread-link">
+            <router-link
+              :to="`/threads/${comment.thread_id}`"
+              class="thread-link"
+              @click="handleThreadLinkClick(comment)"
+            >
               <div class="thread-title">
                 <svg
                   width="16"
@@ -223,9 +227,9 @@ const handleDeleteComment = (comment) => {
 const confirmDelete = () => {
   if (deleteTarget.value) {
     if (deleteTarget.value.type === 'reply') {
-      emit('delete-reply', deleteTarget.value.id)
+      emit('delete-reply', deleteTarget.value)
     } else {
-      emit('delete-comment', deleteTarget.value.id)
+      emit('delete-comment', deleteTarget.value)
     }
   }
   // 모달은 ConfirmModal 컴포넌트에서 자동으로 닫힘
@@ -255,6 +259,15 @@ const truncateText = (text, maxLength) => {
   if (!text) return ''
   if (text.length <= maxLength) return text
   return text.substring(0, maxLength) + '...'
+}
+
+const handleThreadLinkClick = (comment) => {
+  console.log('🔍 [UserCommentsList] 쓰레드 링크 클릭:', {
+    comment,
+    thread_id: comment.thread_id,
+    thread_title: comment.thread_title,
+    type: comment.type,
+  })
 }
 </script>
 

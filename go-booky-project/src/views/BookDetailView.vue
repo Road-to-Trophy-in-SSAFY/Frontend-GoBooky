@@ -418,7 +418,7 @@ const toggleBookSave = async () => {
 
   try {
     // API 호출
-    const response = await api.post(`/auth/books/${book.value.id}/save/`)
+    const response = await api.post(`/auth/auth/books/${book.value.id}/save/`)
 
     // 서버 응답으로 최종 상태 확정
     book.value.is_saved = response.data.is_saved

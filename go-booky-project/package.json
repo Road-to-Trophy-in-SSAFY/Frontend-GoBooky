@@ -24,9 +24,11 @@
     "docs:context7": "echo 'Context7 통합 가이드를 확인하세요: docs/context7-integration.md'"
   },
   "dependencies": {
+    "@ant-design/icons-vue": "^7.0.1",
     "@vueup/vue-quill": "^1.2.0",
     "@vueuse/components": "^13.2.0",
     "@vueuse/core": "^13.2.0",
+    "ant-design-vue": "^4.2.6",
     "axios": "^1.9.0",
     "css-what": "^6.1.0",
     "dompurify": "^3.2.6",

@@ -37,7 +37,7 @@ export const booksAPI = {
    * @returns {Promise} 토글 결과
    */
   async toggleBookSave(bookId) {
-    const response = await api.post(`/auth/books/${bookId}/save/`)
+    const response = await api.post(`/auth/auth/books/${bookId}/save/`)
     return response.data
   },
 

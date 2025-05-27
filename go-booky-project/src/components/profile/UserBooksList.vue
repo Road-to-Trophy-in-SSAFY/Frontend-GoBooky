@@ -1,5 +1,21 @@
 <template>
   <div class="user-books-list">
+    <!-- 뷰 모드 선택 드롭다운 -->
+    <div v-if="books.length > 0 || isLoading" class="view-controls">
+      <div class="view-mode-selector">
+        <label for="viewMode" class="view-label">보기 방식:</label>
+        <select
+          id="viewMode"
+          v-model="viewMode"
+          class="view-dropdown"
+          @change="handleViewModeChange"
+        >
+          <option value="card">카드형</option>
+          <option value="list">목록형</option>
+        </select>
+      </div>
+    </div>
+
     <!-- 로딩 상태 -->
     <div v-if="isLoading && books.length === 0" class="loading-container">
       <div class="loading-spinner"></div>
@@ -8,7 +24,8 @@
 
     <!-- 도서 목록 -->
     <div v-else-if="books.length > 0" class="books-container">
-      <div class="books-grid">
+      <!-- 카드형 보기 -->
+      <div v-if="viewMode === 'card'" class="books-grid">
         <div v-for="book in books" :key="book.id" class="book-card">
           <div class="book-cover-container">
             <img
@@ -42,9 +59,46 @@
             <h3 class="book-title">{{ book.title }}</h3>
             <p class="book-author">{{ book.author }}</p>
             <p class="book-category">{{ book.category_name }}</p>
-            <div class="book-meta">
-              <span class="saved-date">저장일: {{ formatDate(book.saved_at) }}</span>
-            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 리스트형 보기 -->
+      <div v-else class="books-list">
+        <div v-for="book in books" :key="book.id" class="book-list-item">
+          <div class="book-list-cover">
+            <img
+              :src="book.cover || '/default-book-cover.jpg'"
+              :alt="book.title"
+              class="book-list-image"
+              @error="handleImageError"
+            />
+          </div>
+
+          <div class="book-list-info">
+            <h3 class="book-list-title">{{ book.title }}</h3>
+            <p class="book-list-author">{{ book.author }}</p>
+            <p class="book-list-category">{{ book.category_name }}</p>
+          </div>
+
+          <div v-if="isOwnProfile" class="book-list-actions">
+            <button @click="handleRemoveBook(book.id)" class="remove-list-btn" title="저장 해제">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M18 6L6 18M6 6L18 18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -99,7 +153,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps({
   books: {
@@ -131,6 +185,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['remove-book', 'page-change'])
+
+// 뷰 모드 상태 관리
+const viewMode = ref('card')
 
 // 표시할 페이지 번호들 계산
 const visiblePages = computed(() => {
@@ -167,20 +224,56 @@ const handleImageError = (event) => {
   event.target.src = '/default-book-cover.jpg'
 }
 
-const formatDate = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
+const handleViewModeChange = () => {
+  // 뷰 모드 변경 시 필요한 로직이 있다면 여기에 추가
+  console.log('뷰 모드 변경:', viewMode.value)
 }
 </script>
 
 <style scoped>
 .user-books-list {
   min-height: 400px;
+}
+
+/* 뷰 모드 선택 컨트롤 */
+.view-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+  padding: 0 4px;
+}
+
+.view-mode-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.view-dropdown {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.view-dropdown:hover {
+  border-color: #9ca3af;
+}
+
+.view-dropdown:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .loading-container {
@@ -217,6 +310,7 @@ const formatDate = (dateString) => {
   gap: 24px;
 }
 
+/* 카드형 보기 스타일 */
 .books-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -318,14 +412,94 @@ const formatDate = (dateString) => {
   margin: 0 0 8px 0;
 }
 
-.book-meta {
-  border-top: 1px solid #f3f4f6;
-  padding-top: 8px;
+/* 리스트형 보기 스타일 */
+.books-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.saved-date {
-  font-size: 11px;
-  color: #9ca3af;
+.book-list-item {
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  gap: 16px;
+}
+
+.book-list-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.book-list-cover {
+  flex-shrink: 0;
+  width: 80px;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.book-list-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.book-list-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.book-list-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.book-list-author {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 8px 0;
+}
+
+.book-list-category {
+  font-size: 12px;
+  color: #3b82f6;
+  background: #eff6ff;
+  padding: 4px 12px;
+  border-radius: 16px;
+  display: inline-block;
+  margin: 0;
+}
+
+.book-list-actions {
+  flex-shrink: 0;
+}
+
+.remove-list-btn {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.remove-list-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  transform: scale(1.05);
 }
 
 .pagination-container {
@@ -431,6 +605,11 @@ const formatDate = (dateString) => {
 
 /* 반응형 디자인 */
 @media (max-width: 768px) {
+  .view-controls {
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
   .books-grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 16px;
@@ -442,6 +621,24 @@ const formatDate = (dateString) => {
 
   .book-title {
     font-size: 13px;
+  }
+
+  .book-list-item {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .book-list-cover {
+    width: 60px;
+    height: 90px;
+  }
+
+  .book-list-title {
+    font-size: 14px;
+  }
+
+  .book-list-author {
+    font-size: 12px;
   }
 
   .pagination {
@@ -466,6 +663,26 @@ const formatDate = (dateString) => {
   .books-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 12px;
+  }
+
+  .book-list-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .book-list-cover {
+    width: 80px;
+    height: 120px;
+  }
+
+  .book-list-actions {
+    align-self: stretch;
+  }
+
+  .remove-list-btn {
+    width: 100%;
+    height: 36px;
   }
 
   .empty-state {

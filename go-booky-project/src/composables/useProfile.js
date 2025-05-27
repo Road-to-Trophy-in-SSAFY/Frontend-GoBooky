@@ -129,18 +129,47 @@ export function useProfile(usernameRef) {
     try {
       const response = await execute(() => profileAPI.getUserComments(username.value, { page }))
 
-      if (response.results) {
-        // DRF 페이지네이션 응답
+      // 백엔드 응답 구조: { comments: {...}, replies: {...} }
+      if (response.comments && response.replies) {
+        // 댓글과 대댓글을 하나의 배열로 합치기
+        const commentsArray = response.comments.results.map((comment) => ({
+          ...comment,
+          type: 'comment',
+        }))
+
+        const repliesArray = response.replies.results.map((reply) => ({
+          ...reply,
+          type: 'reply',
+        }))
+
+        // 시간순으로 정렬 (최신순)
+        const allComments = [...commentsArray, ...repliesArray].sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at),
+        )
+
+        userComments.value = allComments
+
+        // 페이지네이션 정보 (댓글과 대댓글 합계)
+        const totalCount = response.comments.count + response.replies.count
+        commentsPagination.value = {
+          page: page,
+          totalPages: Math.max(response.comments.num_pages, response.replies.num_pages),
+          totalCount: totalCount,
+          hasNext: response.comments.has_next || response.replies.has_next,
+          hasPrevious: response.comments.has_previous || response.replies.has_previous,
+        }
+      } else if (response.results) {
+        // DRF 페이지네이션 응답 (fallback)
         userComments.value = response.results
         commentsPagination.value = {
           page: page,
-          totalPages: Math.ceil(response.count / 10), // 페이지당 10개
+          totalPages: Math.ceil(response.count / 10),
           totalCount: response.count,
           hasNext: !!response.next,
           hasPrevious: !!response.previous,
         }
       } else {
-        // 일반 배열 응답
+        // 일반 배열 응답 (fallback)
         userComments.value = response
       }
 
@@ -155,15 +184,25 @@ export function useProfile(usernameRef) {
 
   /**
    * 댓글 삭제
-   * @param {number} commentId 댓글 ID
+   * @param {Object} comment 댓글 객체 (threadId 포함)
    * @returns {Promise} 삭제 결과
    */
-  const deleteComment = async (commentId) => {
+  const deleteComment = async (comment) => {
     try {
-      await execute(() => profileAPI.deleteComment(commentId))
+      // threadId와 commentId가 필요
+      const threadId = comment.thread_id || comment.thread?.id
+      const commentId = comment.id
+
+      if (!threadId) {
+        throw new Error('쓰레드 ID를 찾을 수 없습니다.')
+      }
+
+      await execute(() => profileAPI.deleteComment(threadId, commentId))
 
       // 목록에서 제거
-      userComments.value = userComments.value.filter((comment) => comment.id !== commentId)
+      userComments.value = userComments.value.filter(
+        (item) => !(item.type === 'comment' && item.id === commentId),
+      )
 
       showSuccessToast('댓글이 삭제되었습니다.')
       console.log('✅ [useProfile] 댓글 삭제 성공:', commentId)
@@ -176,18 +215,26 @@ export function useProfile(usernameRef) {
 
   /**
    * 대댓글 삭제
-   * @param {number} replyId 대댓글 ID
+   * @param {Object} reply 대댓글 객체 (threadId, commentId 포함)
    * @returns {Promise} 삭제 결과
    */
-  const deleteReply = async (replyId) => {
+  const deleteReply = async (reply) => {
     try {
-      await execute(() => profileAPI.deleteReply(replyId))
+      // threadId, commentId, replyId가 필요
+      const threadId = reply.thread_id || reply.thread?.id
+      const commentId = reply.comment_id || reply.comment?.id
+      const replyId = reply.id
 
-      // 목록에서 제거 (대댓글은 댓글의 replies 배열에서 제거)
-      userComments.value = userComments.value.map((comment) => ({
-        ...comment,
-        replies: comment.replies?.filter((reply) => reply.id !== replyId) || [],
-      }))
+      if (!threadId || !commentId) {
+        throw new Error('쓰레드 ID 또는 댓글 ID를 찾을 수 없습니다.')
+      }
+
+      await execute(() => profileAPI.deleteReply(threadId, commentId, replyId))
+
+      // 목록에서 제거
+      userComments.value = userComments.value.filter(
+        (item) => !(item.type === 'reply' && item.id === replyId),
+      )
 
       showSuccessToast('대댓글이 삭제되었습니다.')
       console.log('✅ [useProfile] 대댓글 삭제 성공:', replyId)
