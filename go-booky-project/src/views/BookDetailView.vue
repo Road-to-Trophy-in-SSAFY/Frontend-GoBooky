@@ -157,6 +157,31 @@
             </h3>
             <p class="description-text">{{ book.description }}</p>
           </div>
+
+          <!-- 오디오북 섹션 -->
+          <div v-if="book.audiobook_url" class="audiobook-section">
+            <h3 class="audiobook-title">
+              <span class="audiobook-icon">🎧</span>
+              오디오북
+            </h3>
+            <div class="audiobook-player">
+              <audio
+                :src="book.audiobook_url"
+                controls
+                preload="metadata"
+                class="audio-player"
+                @error="handleAudioError"
+              >
+                브라우저가 오디오 재생을 지원하지 않습니다.
+              </audio>
+              <div class="audiobook-info">
+                <p class="audiobook-description">
+                  <span class="info-icon">ℹ️</span>
+                  AI가 생성한 이 책의 오디오북을 들어보세요
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <!-- 연관 도서 섹션 -->
@@ -319,6 +344,12 @@ const bookCover = computed(() => {
 // 이미지 로드 에러 처리
 const handleImageError = () => {
   imageError.value = true
+}
+
+// 오디오 로드 에러 처리
+const handleAudioError = (event) => {
+  console.error('오디오 로드 실패:', event)
+  // 오디오 에러 시 사용자에게 알림 (선택사항)
 }
 
 // 날짜 포맷팅
@@ -863,6 +894,72 @@ const submitThread = async () => {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
+/* 오디오북 섹션 스타일 */
+.audiobook-section {
+  background: linear-gradient(135deg, #fef3e2 0%, #fde68a 100%);
+  border-radius: 20px;
+  padding: 32px;
+  border: 1px solid #f59e0b;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.1);
+  margin-top: 24px;
+}
+
+.audiobook-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #92400e;
+  margin: 0 0 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.audiobook-icon {
+  font-size: 20px;
+}
+
+.audiobook-player {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.audio-player {
+  width: 100%;
+  height: 54px;
+  border-radius: 12px;
+  background: white;
+  border: 2px solid #f59e0b;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+}
+
+.audio-player:focus {
+  outline: none;
+  border-color: #d97706;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+}
+
+.audiobook-info {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.audiobook-description {
+  margin: 0;
+  font-size: 14px;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.info-icon {
+  font-size: 16px;
+}
+
 .description-title {
   font-size: 20px;
   font-weight: 700;
@@ -1250,6 +1347,19 @@ const submitThread = async () => {
     padding: 24px;
     margin-top: 24px;
   }
+
+  .audiobook-section {
+    padding: 24px;
+    margin-top: 20px;
+  }
+
+  .audiobook-title {
+    font-size: 16px;
+  }
+
+  .audio-player {
+    height: 48px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1267,6 +1377,23 @@ const submitThread = async () => {
 
   .description-text {
     font-size: 14px;
+  }
+
+  .audiobook-section {
+    padding: 20px;
+    margin-top: 16px;
+  }
+
+  .audiobook-title {
+    font-size: 15px;
+  }
+
+  .audio-player {
+    height: 44px;
+  }
+
+  .audiobook-description {
+    font-size: 13px;
   }
 
   .thread-write-form {
