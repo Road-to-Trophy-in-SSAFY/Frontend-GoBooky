@@ -1,62 +1,68 @@
 <template>
   <div class="landing-view">
-    <!-- Cover Section with Brand Logo and Books -->
-    <section class="cover">
-      <!-- Logo positioned at 1/3 height -->
-      <div class="logo-section">
-        <img src="/logo.png" alt="GoBooky Logo" class="cover-logo" />
+    <!-- Main Section with Grid Layout -->
+    <section class="main-section">
+      <!-- Left Side - GoBooky Title -->
+      <div class="left-section">
+        <h1 class="gobooky-title">Go<span class="booky-white">Booky</span></h1>
       </div>
 
-      <!-- Recommended Books Slider positioned at 2/3 height -->
-      <div class="books-section">
-        <div class="recommended-books">
-          <swiper
-            ref="swiperRef"
-            :modules="modules"
-            :slides-per-view="5"
-            :space-between="8"
-            :loop="true"
-            :speed="1200"
-            :effect="'slide'"
-            :grab-cursor="true"
-            :allow-touch-move="true"
-            :breakpoints="{
-              320: { slidesPerView: 2, spaceBetween: 6 },
-              480: { slidesPerView: 2.5, spaceBetween: 6 },
-              640: { slidesPerView: 3, spaceBetween: 6 },
-              800: { slidesPerView: 3.5, spaceBetween: 6 },
-              968: { slidesPerView: 4, spaceBetween: 8 },
-              1200: { slidesPerView: 5, spaceBetween: 8 },
-              1600: { slidesPerView: 6, spaceBetween: 8 },
-            }"
-            class="books-swiper"
-            @swiper="onSwiper"
-          >
-            <swiper-slide v-for="book in books" :key="book.id" class="book-slide">
-              <div class="book-card">
-                <div class="book-image-wrapper">
-                  <img :src="book.cover" :alt="book.title" class="book-image" />
-                  <div class="book-overlay">
-                    <span class="view-details">자세히 보기</span>
+      <!-- Right Side - Books and Threads -->
+      <div class="right-section">
+        <!-- Recommended Books - Top Right -->
+        <div class="books-section">
+          <!-- (제거된 section-title, 요청대로 사용하지 않음) -->
+          <div class="recommended-books">
+            <Swiper
+              ref="swiperRef"
+              :modules="modules"
+              :slides-per-view="5"
+              :space-between="8"
+              :loop="true"
+              :speed="1200"
+              :effect="'slide'"
+              :grab-cursor="true"
+              :allow-touch-move="true"
+              :breakpoints="{
+                320: { slidesPerView: 2, spaceBetween: 6 },
+                480: { slidesPerView: 2.5, spaceBetween: 6 },
+                640: { slidesPerView: 3, spaceBetween: 6 },
+                800: { slidesPerView: 3.5, spaceBetween: 6 },
+                968: { slidesPerView: 4, spaceBetween: 8 },
+                1200: { slidesPerView: 5, spaceBetween: 8 },
+                1600: { slidesPerView: 6, spaceBetween: 8 },
+              }"
+              class="books-swiper"
+              @swiper="onSwiper"
+            >
+              <SwiperSlide v-for="book in books" :key="book.id" class="book-slide">
+                <div class="book-card">
+                  <div class="book-image-wrapper">
+                    <img :src="book.cover" :alt="book.title" class="book-image" />
+                    <div class="book-overlay">
+                      <span class="view-details">자세히 보기</span>
+                    </div>
+                  </div>
+                  <div class="book-info">
+                    <h3 class="book-title">{{ book.title }}</h3>
+                    <p class="book-author">{{ book.author }}</p>
                   </div>
                 </div>
-                <div class="book-info">
-                  <h3 class="book-title">{{ book.title }}</h3>
-                  <p class="book-author">{{ book.author }}</p>
-                </div>
-              </div>
-            </swiper-slide>
-          </swiper>
+              </SwiperSlide>
+            </Swiper>
+          </div>
+        </div>
+
+        <!-- Recommended Threads - Bottom Right -->
+        <div class="threads-section">
+          <h2 class="section-title">추천 쓰레드</h2>
+          <ul class="threads-list">
+            <li v-for="thread in threads" :key="thread.id" class="thread-item">
+              {{ thread.title }}
+            </li>
+          </ul>
         </div>
       </div>
-    </section>
-
-    <!-- Recommended Threads List -->
-    <section class="recommended-threads">
-      <h2>추천 쓰레드</h2>
-      <ul>
-        <li v-for="thread in threads" :key="thread.id">{{ thread.title }}</li>
-      </ul>
     </section>
   </div>
 </template>
@@ -156,9 +162,7 @@ function onSwiper(swiper) {
 }
 
 function startGSAPAutoSlide() {
-  // GSAP Timeline으로 더 부드러운 자동 슬라이딩
   autoSlideTimeline = gsap.timeline({ repeat: -1 })
-
   autoSlideTimeline
     .to(
       {},
@@ -182,7 +186,6 @@ function startGSAPAutoSlide() {
 }
 
 function setupMagneticHover() {
-  // 각 카드에 Magnetic Hover 효과 추가
   gsap.utils.toArray('.book-card').forEach((card) => {
     const magnetic = card.querySelector('.book-image-wrapper')
 
@@ -230,32 +233,9 @@ function setupMagneticHover() {
 onMounted(() => {
   skrollr.init()
 
-  // 로고 애니메이션 향상
-  gsap.fromTo(
-    '.cover-logo',
-    {
-      opacity: 0,
-      y: 50,
-      scale: 0.8,
-    },
-    {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      duration: 1.5,
-      ease: 'elastic.out(1, 0.5)',
-      delay: 0.5,
-    },
-  )
-
-  // 카드들 등장 애니메이션
   gsap.fromTo(
     '.book-card',
-    {
-      opacity: 0,
-      y: 30,
-      rotationY: 15,
-    },
+    { opacity: 0, y: 30, rotationY: 15 },
     {
       opacity: 1,
       y: 0,
@@ -267,28 +247,21 @@ onMounted(() => {
     },
   )
 
-  // 마우스 호버 이벤트 리스너
   const swiperContainer = document.querySelector('.books-swiper')
   if (swiperContainer) {
     swiperContainer.addEventListener('mouseenter', () => {
       isHovered = true
-      if (autoSlideTimeline) {
-        autoSlideTimeline.pause()
-      }
+      autoSlideTimeline?.pause()
     })
     swiperContainer.addEventListener('mouseleave', () => {
       isHovered = false
-      if (autoSlideTimeline) {
-        autoSlideTimeline.resume()
-      }
+      autoSlideTimeline?.resume()
     })
   }
 })
 
 onUnmounted(() => {
-  if (autoSlideTimeline) {
-    autoSlideTimeline.kill()
-  }
+  autoSlideTimeline?.kill()
 })
 </script>
 
@@ -298,102 +271,85 @@ onUnmounted(() => {
   overflow-x: hidden;
   overflow-y: auto;
   height: 100vh;
+  background: linear-gradient(150deg, #e8f2ff 0%, #f0f8ff 100%);
 }
 
-.cover {
+.main-section {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  grid-template-rows: 1fr;
+  height: 100vh;
+  width: 100%;
+}
+
+.left-section {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  width: 100vw;
-  height: 85vh;
-  background: linear-gradient(150deg, #e8f2ff 0%, #f0f8ff 100%);
-  position: relative;
-  z-index: 2;
-}
-
-/* 로고 섹션 - 상단 1/3 위치 */
-.logo-section {
-  flex: 1;
-  display: flex;
   justify-content: center;
   align-items: center;
-  width: 100%;
+  padding: 2rem;
 }
 
-.cover-logo {
-  width: 300px;
-  max-width: 90vw;
-  height: auto;
-  filter: drop-shadow(0 6px 10px rgba(11, 61, 145, 0.2));
-  animation: float 4s ease-in-out infinite;
-  transform-style: preserve-3d;
+.gobooky-title {
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 4rem;
+  color: #0b3d91;
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+  text-shadow: 0 4px 8px rgba(11, 61, 145, 0.2);
 }
 
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0%);
-  }
-  50% {
-    transform: translateY(-5%);
-  }
+.booky-white {
+  color: white;
 }
 
-/* 도서 섹션 - 하단 2/3 위치 */
+.right-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 2rem;
+  gap: 2rem;
+}
+
 .books-section {
-  flex: 1;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-direction: column;
+  justify-content: flex-start;
   width: 100%;
-  padding-bottom: 2rem;
   position: relative;
+  min-height: 300px;
 }
 
-/* 추천 도서 - Swiper 스타일 */
+.threads-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  width: 100%;
+  position: relative;
+  max-width: 90%;
+}
+
+.section-title {
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 1.8rem;
+  color: #0b3d91;
+  margin-bottom: 1rem;
+  text-align: center;
+  font-weight: 700;
+}
+
 .recommended-books {
   width: 100%;
-  max-width: 1200px;
-  padding: 0 2rem;
+  padding: 0 1rem;
   position: relative;
-}
-
-/* 양 끝 페이드 효과 */
-.recommended-books::before,
-.recommended-books::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 100px;
-  z-index: 10;
-  pointer-events: none;
-}
-
-.recommended-books::before {
-  left: 0;
-  background: linear-gradient(
-    to right,
-    rgba(232, 242, 255, 1) 0%,
-    rgba(232, 242, 255, 0.8) 30%,
-    rgba(232, 242, 255, 0) 100%
-  );
-}
-
-.recommended-books::after {
-  right: 0;
-  background: linear-gradient(
-    to left,
-    rgba(240, 248, 255, 1) 0%,
-    rgba(240, 248, 255, 0.8) 30%,
-    rgba(240, 248, 255, 0) 100%
-  );
 }
 
 .books-swiper {
   width: 100%;
-  padding: 20px 0 40px 0;
+  padding: 10px 0 20px 0;
+  height: 280px;
+  overflow: visible;
 }
 
 .book-slide {
@@ -414,7 +370,7 @@ onUnmounted(() => {
   backdrop-filter: blur(15px);
   border: 1px solid rgba(11, 61, 145, 0.12);
   width: 100%;
-  max-width: 160px;
+  max-width: 140px;
   cursor: pointer;
   transform-style: preserve-3d;
   perspective: 1000px;
@@ -462,7 +418,7 @@ onUnmounted(() => {
 
 .book-image {
   width: 100%;
-  height: 160px;
+  height: 140px;
   object-fit: cover;
   transition: transform 0.5s ease;
 }
@@ -479,7 +435,6 @@ onUnmounted(() => {
   justify-content: center;
   opacity: 0;
   transition: all 0.4s ease;
-  backdrop-filter: none;
 }
 
 .book-card:hover .book-overlay {
@@ -501,7 +456,6 @@ onUnmounted(() => {
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.15);
   transition: all 0.3s ease;
-  backdrop-filter: none;
 }
 
 .book-card:hover .view-details {
@@ -527,7 +481,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
   transition: color 0.3s ease;
 }
 
@@ -550,45 +503,28 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* 추천 쓰레드 섹션 */
-.recommended-threads {
-  padding: 3rem 1rem;
-  background: linear-gradient(135deg, #fafcff 0%, #f0f8ff 100%);
-  position: relative;
-  z-index: 1;
-  margin-top: -5vh;
-}
-
-.recommended-threads h2 {
-  font-family: 'Comfortaa', sans-serif;
-  font-size: 2.2rem;
-  color: #0b3d91;
-  margin-bottom: 1.5rem;
-  text-align: center;
-  font-weight: 700;
-}
-
-.recommended-threads ul {
+.threads-list {
   list-style: none;
   padding: 0;
-  max-width: 800px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
 }
 
-.recommended-threads li {
-  padding: 1rem 1.5rem;
+.thread-item {
+  padding: 0.8rem 1rem;
   margin-bottom: 0.5rem;
-  border-radius: 12px;
-  background: white;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 2px 8px rgba(11, 61, 145, 0.08);
   font-family: 'Ubuntu', sans-serif;
   color: #333;
   transition: all 0.3s ease;
-  border-left: 4px solid #2879c8;
+  border-left: 3px solid #2879c8;
   cursor: pointer;
+  font-size: 0.9rem;
 }
 
-.recommended-threads li:hover {
+.thread-item:hover {
   transform: translateX(8px);
   box-shadow: 0 4px 16px rgba(11, 61, 145, 0.12);
   background: #f8faff;
@@ -596,58 +532,75 @@ onUnmounted(() => {
 
 /* 반응형 디자인 */
 @media (max-width: 768px) {
-  .cover {
-    height: 90vh;
+  .main-section {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
 
-  .cover-logo {
-    width: 250px;
-    max-width: 80vw;
+  .left-section {
+    padding: 1rem;
+    min-height: 150px;
+  }
+
+  .right-section {
+    padding: 1rem;
+  }
+
+  .gobooky-title {
+    font-size: 2.5rem;
+  }
+
+  .books-section {
+    padding-bottom: 1rem;
+  }
+
+  .threads-section {
+    padding-top: 1rem;
+  }
+
+  .section-title {
+    font-size: 1.5rem;
   }
 
   .book-card {
-    max-width: 140px;
+    max-width: 100px;
   }
 
   .book-image {
-    height: 140px;
-  }
-
-  .book-title {
-    font-size: 0.8rem;
-    height: 2rem;
-  }
-
-  .book-author {
-    font-size: 0.7rem;
-  }
-
-  .view-details {
-    font-size: 0.7rem;
-    padding: 4px 8px;
-  }
-
-  .recommended-threads h2 {
-    font-size: 1.8rem;
-  }
-
-  /* 모바일에서는 페이드 효과 줄이기 */
-  .recommended-books::before,
-  .recommended-books::after {
-    width: 50px;
+    height: 100px;
   }
 }
 
 @media (max-width: 480px) {
-  .cover-logo {
-    width: 200px;
-    max-width: 75vw;
+  .gobooky-title {
+    font-size: 2rem;
+  }
+
+  .section-title {
+    font-size: 1.3rem;
+  }
+
+  .book-card {
+    max-width: 90px;
+  }
+
+  .book-image {
+    height: 90px;
+  }
+
+  .thread-item {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.8rem;
   }
 }
 
 @media (min-width: 1600px) {
-  .cover-logo {
-    width: 350px;
+  .gobooky-title {
+    font-size: 5rem;
+  }
+
+  .section-title {
+    font-size: 2rem;
   }
 }
 </style>
