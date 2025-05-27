@@ -48,7 +48,14 @@
             <div class="meta-icon">👤</div>
             <div class="meta-content">
               <span class="meta-label">작성자</span>
-              <span class="meta-value">{{ thread.user?.username || '익명' }}</span>
+              <router-link
+                v-if="thread.user?.username"
+                :to="{ name: 'profile', params: { username: thread.user.username } }"
+                class="author-link"
+              >
+                {{ thread.user.username || '익명' }}
+              </router-link>
+              <span v-else class="meta-value">{{ thread.user?.username || '익명' }}</span>
             </div>
           </div>
 
@@ -950,6 +957,22 @@ onUnmounted(() => {
 .book-link:hover {
   color: #ffd700;
   border-bottom-color: #ffd700;
+}
+
+.author-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+}
+
+.author-link:hover {
+  color: #ffd700;
+  border-bottom-color: #ffd700;
+  transform: translateY(-1px);
 }
 
 /* 이미지 섹션 */
