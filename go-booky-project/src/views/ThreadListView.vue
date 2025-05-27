@@ -51,31 +51,19 @@
             <div class="thread-actions">
               <button @click="goToThreadDetail(thread.id)" class="detail-btn">자세히 보기</button>
             </div>
-            <button
-              @click.stop="toggleLike(thread)"
-              class="like-btn"
-              :class="{ liked: getThreadLikeStatus(thread), animate: isAnimating(thread.id) }"
-              :aria-label="getThreadLikeStatus(thread) ? '좋아요 취소' : '좋아요'"
-              :aria-pressed="getThreadLikeStatus(thread)"
-              type="button"
-              :data-thread-id="thread.id"
+            <!-- 좋아요 상태 표시 (읽기 전용) -->
+            <div
+              class="like-status"
+              :class="{ liked: getThreadLikeStatus(thread) }"
+              :aria-label="`좋아요 ${getThreadLikesCount(thread)}개`"
+              :title="getThreadLikeStatus(thread) ? '내가 좋아요한 글' : '좋아요 상태'"
             >
-              <Transition name="heart" mode="out-in">
-                <span
-                  v-if="getThreadLikeStatus(thread)"
-                  key="filled"
-                  class="heart-icon filled"
-                  aria-hidden="true"
-                  >❤️</span
-                >
-                <span v-else key="empty" class="heart-icon empty" aria-hidden="true">🤍</span>
-              </Transition>
-              <Transition name="count" mode="out-in">
-                <span :key="getThreadLikesCount(thread)" class="like-count">{{
-                  getThreadLikesCount(thread)
-                }}</span>
-              </Transition>
-            </button>
+              <span v-if="getThreadLikeStatus(thread)" class="heart-icon filled" aria-hidden="true"
+                >❤️</span
+              >
+              <span v-else class="heart-icon empty" aria-hidden="true">🤍</span>
+              <span class="like-count">{{ getThreadLikesCount(thread) }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -113,20 +101,11 @@ import { useRouter } from 'vue-router'
 import { categoriesData } from '@/stores/categoriesData.js'
 import { useThreads } from '@/composables/useThreads'
 import { useToast } from '@/composables/useToast'
-import { useAnimation } from '@/composables/useAnimation'
 import { useThreadStore } from '@/stores/thread'
 
 // 지침에 따른 Composables 사용
-const {
-  threads,
-  pagination,
-  isLoading,
-  error,
-  fetchThreads,
-  toggleLike: toggleThreadLike,
-} = useThreads()
+const { threads, pagination, isLoading, error, fetchThreads } = useThreads()
 const { error: showErrorToast } = useToast()
-const { startAnimation, isAnimating } = useAnimation()
 const router = useRouter()
 
 // ThreadStore 직접 접근 (반응성 보장)
@@ -300,31 +279,7 @@ const getThreadLikesCount = (thread) => {
   return storeThread?.likes_count ?? thread.likes_count ?? 0
 }
 
-const toggleLike = async (thread) => {
-  try {
-    // 현재 상태 로깅
-    console.log('🎯 [ThreadListView] 좋아요 토글 시작:', {
-      threadId: thread.id,
-      currentLiked: thread.liked,
-      currentCount: thread.likes_count,
-    })
-
-    // 애니메이션 시작
-    startAnimation(thread.id)
-
-    // Pinia store를 통한 좋아요 토글 (Optimistic UI 포함)
-    await toggleThreadLike(thread.id)
-
-    console.log('✅ [ThreadListView] 좋아요 토글 성공:', {
-      threadId: thread.id,
-      newLiked: thread.liked,
-      newCount: thread.likes_count,
-    })
-  } catch (error) {
-    console.error('❌ [ThreadListView] 좋아요 토글 실패:', error)
-    showErrorToast(error.message || '로그인 후 이용 가능합니다.')
-  }
-}
+// 좋아요 기능은 ThreadDetailView에서만 사용하도록 제거됨
 </script>
 
 <style scoped>
@@ -508,48 +463,24 @@ const toggleLike = async (thread) => {
   background: #2563eb;
 }
 
-.like-btn {
+/* 좋아요 상태 표시 (읽기 전용) */
+.like-status {
   position: absolute;
   top: 16px;
   right: 16px;
-  background: none;
-  border: none;
-  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 8px;
   border-radius: 20px;
-  transition: all 0.2s;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(4px);
+  pointer-events: none; /* 클릭 방지 */
+  user-select: none; /* 텍스트 선택 방지 */
 }
 
-.like-btn:hover {
-  background: rgba(255, 255, 255, 1);
-  transform: scale(1.05);
-}
-
-.like-btn.animate {
-  animation: heartBeat 0.6s ease-in-out;
-}
-
-@keyframes heartBeat {
-  0% {
-    transform: scale(1);
-  }
-  25% {
-    transform: scale(1.2);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  75% {
-    transform: scale(1.15);
-  }
-  100% {
-    transform: scale(1);
-  }
+.like-status.liked {
+  background: rgba(255, 240, 245, 0.95);
 }
 
 .heart-icon {
@@ -565,35 +496,7 @@ const toggleLike = async (thread) => {
   text-align: center;
 }
 
-.heart-enter-active,
-.heart-leave-active {
-  transition: all 0.3s ease;
-}
-
-.heart-enter-from {
-  opacity: 0;
-  transform: scale(0.5);
-}
-
-.heart-leave-to {
-  opacity: 0;
-  transform: scale(1.5);
-}
-
-.count-enter-active,
-.count-leave-active {
-  transition: all 0.2s ease;
-}
-
-.count-enter-from {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-.count-leave-to {
-  opacity: 0;
-  transform: translateY(10px);
-}
+/* 애니메이션 관련 CSS 제거됨 - ThreadDetailView에서만 사용 */
 
 .loading-more {
   display: flex;
