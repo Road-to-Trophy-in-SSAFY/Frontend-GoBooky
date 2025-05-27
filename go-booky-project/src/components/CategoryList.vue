@@ -269,45 +269,4 @@ async function selectCategory(pk) {
     font-size: 14px;
   }
 }
-
-/* 애니메이션 */
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.category-button {
-  animation: slideIn 0.3s ease forwards;
-}
-
-.category-button:nth-child(1) {
-  animation-delay: 0.1s;
-}
-.category-button:nth-child(2) {
-  animation-delay: 0.15s;
-}
-.category-button:nth-child(3) {
-  animation-delay: 0.2s;
-}
-.category-button:nth-child(4) {
-  animation-delay: 0.25s;
-}
-.category-button:nth-child(5) {
-  animation-delay: 0.3s;
-}
-.category-button:nth-child(6) {
-  animation-delay: 0.35s;
-}
-.category-button:nth-child(7) {
-  animation-delay: 0.4s;
-}
-.category-button:nth-child(8) {
-  animation-delay: 0.45s;
-}
 </style>
