@@ -113,41 +113,43 @@
               </div>
             </div>
           </div>
+
+          <!-- 책 상세 정보 -->
+          <div class="book-details-vertical">
+            <div class="book-detail-item-vertical">
+              <div class="detail-icon">👤</div>
+              <div class="detail-content-vertical">
+                <span class="detail-label">저자</span>
+                <span class="detail-value">{{ book.author }}</span>
+              </div>
+            </div>
+            <div class="book-detail-item-vertical">
+              <div class="detail-icon">🏢</div>
+              <div class="detail-content-vertical">
+                <span class="detail-label">출판사</span>
+                <span class="detail-value">{{ book.publisher }}</span>
+              </div>
+            </div>
+            <div class="book-detail-item-vertical">
+              <div class="detail-icon">📅</div>
+              <div class="detail-content-vertical">
+                <span class="detail-label">출간일</span>
+                <span class="detail-value">{{ formatDate(book.pub_date) }}</span>
+              </div>
+            </div>
+            <div v-if="book.isbn" class="book-detail-item-vertical">
+              <div class="detail-icon">🔢</div>
+              <div class="detail-content-vertical">
+                <span class="detail-label">ISBN</span>
+                <span class="detail-value">{{ book.isbn }}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="book-info-section">
           <div class="book-meta">
             <h1 class="book-title">{{ book.title }}</h1>
-            <div class="book-details-grid">
-              <div class="book-detail-item">
-                <div class="detail-icon">👤</div>
-                <div class="detail-content">
-                  <span class="detail-label">저자</span>
-                  <span class="detail-value">{{ book.author }}</span>
-                </div>
-              </div>
-              <div class="book-detail-item">
-                <div class="detail-icon">🏢</div>
-                <div class="detail-content">
-                  <span class="detail-label">출판사</span>
-                  <span class="detail-value">{{ book.publisher }}</span>
-                </div>
-              </div>
-              <div class="book-detail-item">
-                <div class="detail-icon">📅</div>
-                <div class="detail-content">
-                  <span class="detail-label">출간일</span>
-                  <span class="detail-value">{{ formatDate(book.pub_date) }}</span>
-                </div>
-              </div>
-              <div v-if="book.isbn" class="book-detail-item">
-                <div class="detail-icon">🔢</div>
-                <div class="detail-content">
-                  <span class="detail-label">ISBN</span>
-                  <span class="detail-value">{{ book.isbn }}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           <div v-if="book.description" class="book-description">
@@ -736,41 +738,49 @@ const submitThread = async () => {
   line-height: 1.2;
 }
 
-/* 책 상세 정보 그리드 */
-.book-details-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
+/* 책 상세 정보 세로 배치 */
+.book-details-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin-top: 24px;
 }
 
-.book-detail-item {
+.book-detail-item-vertical {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px;
+  gap: 12px;
+  padding: 16px;
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-radius: 16px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   transition: all 0.3s ease;
 }
 
-.book-detail-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+.book-detail-item-vertical:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   border-color: #cbd5e1;
 }
 
+.detail-content-vertical {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .detail-icon {
-  font-size: 24px;
-  width: 48px;
-  height: 48px;
+  font-size: 20px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: white;
-  border-radius: 12px;
+  border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
 }
 
 .detail-content {
@@ -979,6 +989,7 @@ const submitThread = async () => {
   line-height: 1.8;
   color: #475569;
   margin: 0;
+  white-space: pre-line;
 }
 
 /* 모달 스타일 */
@@ -1275,9 +1286,17 @@ const submitThread = async () => {
   }
 
   .book-header {
-    grid-template-columns: 250px 1fr;
+    grid-template-columns: 280px 1fr;
     gap: 32px;
     padding: 32px;
+  }
+
+  .book-cover-wrapper {
+    max-width: 100%;
+  }
+
+  .book-details-vertical {
+    margin-top: 20px;
   }
 
   .book-title {
@@ -1291,22 +1310,38 @@ const submitThread = async () => {
   }
 
   .book-header {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 24px;
     padding: 24px;
   }
 
   .book-cover-section {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
   }
 
   .book-cover-wrapper {
-    max-width: 200px;
+    max-width: 220px;
+    width: 100%;
   }
 
   .book-cover-image {
-    height: 280px;
+    height: 300px;
+  }
+
+  .book-details-vertical {
+    width: 100%;
+    max-width: 400px;
+    gap: 10px;
+    margin-top: 0;
+  }
+
+  .book-detail-item-vertical {
+    padding: 14px;
+    gap: 10px;
   }
 
   .book-title {
@@ -1316,11 +1351,6 @@ const submitThread = async () => {
 
   .book-meta {
     gap: 12px;
-  }
-
-  .book-details-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
   }
 
   .form-layout {
@@ -1368,7 +1398,45 @@ const submitThread = async () => {
   }
 
   .book-header {
-    padding: 20px;
+    padding: 16px;
+    gap: 20px;
+  }
+
+  .book-cover-section {
+    gap: 16px;
+  }
+
+  .book-cover-wrapper {
+    max-width: 180px;
+  }
+
+  .book-cover-image {
+    height: 240px;
+  }
+
+  .book-details-vertical {
+    max-width: 100%;
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .book-detail-item-vertical {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .detail-icon {
+    font-size: 16px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .detail-label {
+    font-size: 11px;
+  }
+
+  .detail-value {
+    font-size: 14px;
   }
 
   .book-title {
@@ -1402,6 +1470,52 @@ const submitThread = async () => {
 
   .selected-book-info {
     padding: 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .book-detail-container {
+    padding: 8px;
+  }
+
+  .book-header {
+    padding: 12px;
+    gap: 16px;
+  }
+
+  .book-cover-wrapper {
+    max-width: 160px;
+  }
+
+  .book-cover-image {
+    height: 220px;
+  }
+
+  .book-details-vertical {
+    gap: 6px;
+  }
+
+  .book-detail-item-vertical {
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .detail-icon {
+    font-size: 14px;
+    width: 28px;
+    height: 28px;
+  }
+
+  .detail-label {
+    font-size: 10px;
+  }
+
+  .detail-value {
+    font-size: 13px;
+  }
+
+  .book-title {
+    font-size: 18px;
   }
 }
 
