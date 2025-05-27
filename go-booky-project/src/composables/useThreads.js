@@ -90,12 +90,33 @@ export function useThreads() {
    * @returns {Promise} 쓰레드 상세 정보
    */
   const fetchThread = async (threadId) => {
+    console.log('🔍 [useThreads] fetchThread 시작 - ID:', threadId)
+
     try {
+      console.log('📡 [useThreads] API 호출 시작')
       const response = await execute(() => threadsAPI.getThread(threadId))
+      console.log('✅ [useThreads] fetchThread 성공')
+
+      console.log('📋 [useThreads] 받은 데이터:', {
+        id: response.id,
+        title: response.title,
+        cover_img: response.cover_img,
+        cover_img_url: response.cover_img_url,
+        created_at: response.created_at,
+      })
+
+      // 스토어에 저장
       threadStore.setThreadDetail(response)
+      console.log('💾 [useThreads] 스토어에 저장 완료')
+
       return response
     } catch (err) {
-      console.error('❌ [useThreads] 쓰레드 상세 조회 실패:', err)
+      console.error('❌ [useThreads] fetchThread 실패:', err)
+      console.error('📊 [useThreads] 에러 상세:', {
+        message: err.message,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+      })
       throw err
     }
   }
@@ -291,6 +312,31 @@ export function useThreads() {
     reset()
   }
 
+  /**
+   * 여러 쓰레드의 좋아요 상태 조회
+   * @param {Array<number>} threadIds 쓰레드 ID 배열
+   * @returns {Promise} 좋아요 상태 맵
+   */
+  const fetchLikeStatus = async (threadIds) => {
+    try {
+      if (!threadIds || threadIds.length === 0) {
+        return {}
+      }
+
+      const response = await execute(() => threadsAPI.getLikeStatus(threadIds))
+
+      // 스토어에 좋아요 상태 저장
+      threadStore.setLikeStatus(response)
+
+      console.log('✅ [useThreads] 좋아요 상태 조회 성공:', Object.keys(response).length, '개')
+      return response
+    } catch (err) {
+      console.error('❌ [useThreads] 좋아요 상태 조회 실패:', err)
+      // 에러가 발생해도 빈 객체 반환 (UI 깨짐 방지)
+      return {}
+    }
+  }
+
   return {
     // 상태
     threads,
@@ -318,6 +364,7 @@ export function useThreads() {
     setSelectedThread,
     resetThreads,
     clearError,
+    fetchLikeStatus,
   }
 }
 

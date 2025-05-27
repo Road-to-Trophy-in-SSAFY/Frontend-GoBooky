@@ -13,6 +13,7 @@ export const useThreadStore = defineStore(
     // === State ===
     const threadsMap = ref(new Map()) // ID를 키로 하는 Map으로 변경
     const threadDetail = ref(null)
+    const likeStatusMap = ref(new Map()) // 좋아요 상태 별도 관리
     const pagination = ref({
       page: 1,
       totalPages: 1,
@@ -189,6 +190,28 @@ export const useThreadStore = defineStore(
     }
 
     /**
+     * 좋아요 상태 설정
+     * @param {Object} likeStatusData 좋아요 상태 데이터 { threadId: { liked: boolean, likes_count: number } }
+     */
+    function setLikeStatus(likeStatusData) {
+      Object.entries(likeStatusData).forEach(([threadId, status]) => {
+        const numericId = parseInt(threadId)
+        likeStatusMap.value.set(numericId, status)
+      })
+      console.log('✅ [ThreadStore] 좋아요 상태 설정:', Object.keys(likeStatusData).length, '개')
+    }
+
+    /**
+     * 특정 쓰레드의 좋아요 상태 조회
+     * @param {number} threadId 쓰레드 ID
+     * @returns {Object} { liked: boolean, likes_count: number }
+     */
+    function getLikeStatus(threadId) {
+      const numericId = parseInt(threadId)
+      return likeStatusMap.value.get(numericId) || { liked: false, likes_count: 0 }
+    }
+
+    /**
      * 쓰레드 좋아요 상태 업데이트 (Optimistic UI 지원)
      * @param {number} threadId 쓰레드 ID
      * @param {boolean} liked 좋아요 상태
@@ -202,25 +225,8 @@ export const useThreadStore = defineStore(
         return
       }
 
-      let updatedInList = false
-      let updatedInDetail = false
-
-      // 목록 업데이트 - Map을 완전히 새로 생성하여 반응성 보장
-      if (threadsMap.value.has(numericThreadId)) {
-        const currentThread = threadsMap.value.get(numericThreadId)
-        const updatedThread = {
-          ...currentThread,
-          liked,
-          likes_count: likesCount,
-        }
-
-        // 새로운 Map 생성하여 반응성 트리거
-        const newMap = new Map(threadsMap.value)
-        newMap.set(numericThreadId, updatedThread)
-        threadsMap.value = newMap
-
-        updatedInList = true
-      }
+      // 좋아요 상태 업데이트
+      likeStatusMap.value.set(numericThreadId, { liked, likes_count: likesCount })
 
       // 상세 페이지 업데이트
       if (threadDetail.value?.id === numericThreadId) {
@@ -229,16 +235,12 @@ export const useThreadStore = defineStore(
           liked,
           likes_count: likesCount,
         }
-        updatedInDetail = true
       }
 
-      console.log('✅ [ThreadStore] 좋아요 상태 동기화 (강제 반응성):', {
+      console.log('✅ [ThreadStore] 좋아요 상태 업데이트:', {
         threadId: numericThreadId,
         liked,
         likesCount,
-        updatedInList,
-        updatedInDetail,
-        totalThreadsInList: threadsMap.value.size,
       })
     }
 
@@ -248,6 +250,7 @@ export const useThreadStore = defineStore(
     function reset() {
       threadsMap.value.clear()
       threadDetail.value = null
+      likeStatusMap.value.clear()
       pagination.value = {
         page: 1,
         totalPages: 1,
@@ -285,6 +288,8 @@ export const useThreadStore = defineStore(
       addThread,
       updateThread,
       removeThread,
+      setLikeStatus,
+      getLikeStatus,
       updateThreadLike,
       reset,
     }

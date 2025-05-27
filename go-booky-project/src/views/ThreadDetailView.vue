@@ -325,6 +325,7 @@ import { useToast } from '@/composables/useToast'
 import { useAnimation } from '@/composables/useAnimation'
 import { useAuthStore } from '@/stores/auth'
 import { useThreadStore } from '@/stores/thread'
+import api from '@/api/index'
 
 const route = useRoute()
 const router = useRouter()
@@ -352,14 +353,14 @@ const showDeleteModal = ref(false)
 // 🔧 좋아요 상태를 스토어에서 직접 가져와서 동기화 보장
 const isLiked = computed(() => {
   if (!thread.value?.id) return false
-  const storeThread = threadStore.getThreadById(thread.value.id)
-  return storeThread?.liked || thread.value?.liked || false
+  const likeStatus = threadStore.getLikeStatus(thread.value.id)
+  return likeStatus.liked || thread.value?.liked || false
 })
 
 const likesCount = computed(() => {
   if (!thread.value?.id) return 0
-  const storeThread = threadStore.getThreadById(thread.value.id)
-  return storeThread?.likes_count || thread.value?.likes_count || 0
+  const likeStatus = threadStore.getLikeStatus(thread.value.id)
+  return likeStatus.likes_count || thread.value?.likes_count || 0
 })
 
 // 페이지 전환 상태 관리
@@ -393,7 +394,7 @@ const imageState = ref({
 
 // 이미지 생성 폴링 관련
 const imagePollingInterval = ref(null)
-const maxPollingAttempts = 30 // 최대 30번 시도 (약 1분)
+// const maxPollingAttempts = 30 // 최대 30번 시도 (약 1분)
 const pollingAttempts = ref(0)
 
 // API URL
@@ -401,7 +402,20 @@ const API_URL = 'http://127.0.0.1:8000'
 
 // 이미지 상태 초기화 및 로딩 로직
 const initializeImageState = () => {
-  if (!thread.value) return
+  console.log('🎬 [ImageState] 이미지 상태 초기화 시작')
+
+  if (!thread.value) {
+    console.log('❌ [ImageState] thread.value가 없음')
+    return
+  }
+
+  console.log('📋 [ImageState] 쓰레드 정보:', {
+    id: thread.value.id,
+    title: thread.value.title,
+    cover_img: thread.value.cover_img,
+    cover_img_url: thread.value.cover_img_url,
+    created_at: thread.value.created_at,
+  })
 
   // 기존 폴링 정리
   clearImagePolling()
@@ -415,22 +429,29 @@ const initializeImageState = () => {
     loadAttempted: false,
     isGenerating: false,
   }
+  console.log('🔄 [ImageState] 상태 초기화 완료')
 
   // 이미지 URL 확인
   let imageUrl = null
 
   if (thread.value.cover_img_url) {
     imageUrl = thread.value.cover_img_url
+    console.log('🔗 [ImageState] cover_img_url 사용:', imageUrl)
   } else if (thread.value.cover_img) {
     if (thread.value.cover_img.startsWith('http')) {
       imageUrl = thread.value.cover_img
+      console.log('🔗 [ImageState] cover_img (HTTP) 사용:', imageUrl)
     } else {
       imageUrl = `${API_URL}/media/${thread.value.cover_img}`
+      console.log('🔗 [ImageState] cover_img (상대경로) 사용:', imageUrl)
     }
+  } else {
+    console.log('❌ [ImageState] 이미지 URL 없음')
   }
 
   if (imageUrl) {
     // 이미지가 있는 경우 로딩 시작
+    console.log('🖼️ [ImageState] 이미지 로딩 시작:', imageUrl)
     imageState.value.loading = true
     imageState.value.actualImageUrl = imageUrl
     imageState.value.loadAttempted = true
@@ -438,13 +459,14 @@ const initializeImageState = () => {
     // 이미지 프리로드
     const img = new Image()
     img.onload = () => {
+      console.log('✅ [ImageState] 이미지 프리로드 성공:', imageUrl)
       imageState.value.loading = false
       imageState.value.showActualImage = true
     }
     img.onerror = () => {
+      console.error('❌ [ImageState] 이미지 프리로드 실패:', imageUrl)
       imageState.value.loading = false
       imageState.value.hasError = true
-      console.warn('🖼️ [ThreadDetailView] 이미지 로드 실패:', imageUrl)
     }
     img.src = imageUrl
   } else {
@@ -453,12 +475,20 @@ const initializeImageState = () => {
     const currentTime = new Date().getTime()
     const timeDiff = currentTime - threadCreatedTime
 
+    console.log('⏰ [ImageState] 시간 차이 계산:', {
+      threadCreatedTime: new Date(threadCreatedTime).toISOString(),
+      currentTime: new Date(currentTime).toISOString(),
+      timeDiffMs: timeDiff,
+      timeDiffMin: Math.round(timeDiff / 60000),
+    })
+
     // 5분 이내에 생성된 쓰레드라면 이미지 생성 중으로 간주
     if (timeDiff < 5 * 60 * 1000) {
-      console.log('🎨 [ThreadDetailView] 최근 생성된 쓰레드 - 이미지 생성 폴링 시작')
+      console.log('🎨 [ImageState] 최근 생성된 쓰레드 - 이미지 생성 폴링 시작')
       startImageGenerationPolling()
     } else {
       // 오래된 쓰레드는 바로 대체 이미지 표시
+      console.log('🕰️ [ImageState] 오래된 쓰레드 - 대체 이미지 표시')
       imageState.value.loading = false
       imageState.value.loadAttempted = true
     }
@@ -467,69 +497,149 @@ const initializeImageState = () => {
 
 // 이미지 생성 폴링 시작
 const startImageGenerationPolling = () => {
+  console.log('🔄 [Polling] 이미지 생성 폴링 시작')
+  console.log('📋 [Polling] 현재 쓰레드 ID:', route.params.id)
+
   imageState.value.isGenerating = true
   imageState.value.loading = true
   pollingAttempts.value = 0
+  let consecutiveErrors = 0
 
-  console.log('🔄 [ThreadDetailView] 이미지 생성 폴링 시작')
+  console.log('🔄 [Polling] 폴링 상태 설정 완료')
 
   imagePollingInterval.value = setInterval(async () => {
     pollingAttempts.value++
+    console.log(`🔄 [Polling] 폴링 시도 ${pollingAttempts.value}회차 시작`)
 
     try {
-      // 쓰레드 정보 다시 조회
-      await fetchThread(parseInt(route.params.id))
+      console.log('📡 [Polling] fetchThread 호출 시작 (캐시 우회)')
+      // 캐시 우회를 위한 타임스탬프 파라미터 추가
+      const timestamp = Date.now()
+      const threadId = parseInt(route.params.id)
+
+      // 캐시를 우회하여 직접 API 호출
+      try {
+        const response = await api.get(`/api/threads/${threadId}/?_t=${timestamp}`)
+
+        if (response.data) {
+          // selectedThread를 직접 업데이트하는 대신 fetchThread 사용
+          await fetchThread(threadId)
+          console.log('✅ [Polling] 캐시 우회 API 호출 성공')
+        }
+      } catch (apiError) {
+        // API 직접 호출 실패 시 기본 fetchThread 사용
+        console.log('⚠️ [Polling] 직접 API 호출 실패, fetchThread 사용')
+        await fetchThread(threadId)
+      }
+
+      // 성공 시 연속 오류 카운터 리셋
+      consecutiveErrors = 0
+      console.log('🔄 [Polling] 연속 오류 카운터 리셋')
+
+      // 현재 쓰레드 상태 로그
+      console.log('📋 [Polling] 현재 쓰레드 상태:', {
+        id: thread.value?.id,
+        cover_img: thread.value?.cover_img,
+        cover_img_url: thread.value?.cover_img_url,
+        hasImage: !!(thread.value?.cover_img || thread.value?.cover_img_url),
+      })
 
       // 이미지가 생성되었는지 확인
       if (thread.value && (thread.value.cover_img || thread.value.cover_img_url)) {
-        console.log('✅ [ThreadDetailView] 이미지 생성 완료 감지')
-        clearImagePolling()
+        console.log('✅ [Polling] 이미지 생성 완료 감지!')
+        console.log('🖼️ [Polling] 감지된 이미지 정보:', {
+          cover_img: thread.value.cover_img,
+          cover_img_url: thread.value.cover_img_url,
+        })
 
-        // 부드러운 전환을 위해 약간의 지연 후 이미지 로딩 시작
+        clearImagePolling()
+        console.log('🛑 [Polling] 폴링 중단 완료')
+
         setTimeout(() => {
+          console.log('🎨 [Polling] 이미지 상태 재초기화 시작')
           initializeImageState()
-          // 이미지 생성 완료 알림 (선택적)
-          console.log('🎨 [ThreadDetailView] AI 이미지 생성이 완료되었습니다!')
+          console.log('🎨 [Polling] AI 이미지 생성이 완료되었습니다!')
         }, 300)
         return
       }
 
-      // 최대 시도 횟수 도달 시 폴링 중단
-      if (pollingAttempts.value >= maxPollingAttempts) {
-        console.log('⏰ [ThreadDetailView] 이미지 생성 폴링 타임아웃')
+      console.log('⏳ [Polling] 아직 이미지가 생성되지 않음')
+
+      // 최대 시도 횟수를 10회로 줄임 (기존 30회에서)
+      if (pollingAttempts.value >= 10) {
+        console.log('⏰ [Polling] 이미지 생성 폴링 타임아웃 (10회 시도)')
         clearImagePolling()
         imageState.value.isGenerating = false
         imageState.value.loading = false
         imageState.value.loadAttempted = true
+        console.log('🛑 [Polling] 타임아웃으로 폴링 종료')
       }
     } catch (error) {
-      console.error('❌ [ThreadDetailView] 이미지 폴링 중 오류:', error)
+      consecutiveErrors++
+      console.error('❌ [Polling] 이미지 폴링 중 오류:', error)
+      console.error('📊 [Polling] 오류 상세:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        consecutiveErrors,
+        pollingAttempts: pollingAttempts.value,
+      })
+
+      // 인증 오류(401) 또는 연속 2회 오류 시 즉시 폴링 중단 (기존 3회에서 2회로)
+      if (error.response?.status === 401 || consecutiveErrors >= 2) {
+        console.log('🛑 [Polling] 폴링 중단 - 인증 오류 또는 연속 오류')
+        console.log('📊 [Polling] 중단 사유:', {
+          isAuthError: error.response?.status === 401,
+          consecutiveErrors,
+          threshold: 2,
+        })
+
+        clearImagePolling()
+        imageState.value.isGenerating = false
+        imageState.value.loading = false
+        imageState.value.loadAttempted = true
+        console.log('🛑 [Polling] 오류로 인한 폴링 종료')
+        return // 즉시 종료
+      }
     }
-  }, 2000) // 2초마다 확인
+  }, 2000) // 3초에서 2초로 감소하여 더 빠른 감지
+
+  console.log('⏰ [Polling] 폴링 인터벌 설정 완료 (2초 간격)')
 }
 
 // 이미지 폴링 정리
 const clearImagePolling = () => {
+  console.log('🧹 [Polling] 이미지 폴링 정리 시작')
+
   if (imagePollingInterval.value) {
+    console.log('⏹️ [Polling] 기존 폴링 인터벌 제거')
     clearInterval(imagePollingInterval.value)
     imagePollingInterval.value = null
+  } else {
+    console.log('ℹ️ [Polling] 제거할 폴링 인터벌 없음')
   }
+
   imageState.value.isGenerating = false
   pollingAttempts.value = 0
+  console.log('🧹 [Polling] 폴링 상태 초기화 완료')
 }
 
 // 이미지 로드 성공 핸들러
 const handleImageLoad = () => {
-  console.log('✅ [ThreadDetailView] 이미지 로드 성공')
+  console.log('✅ [ImageLoad] 이미지 로드 성공')
+  console.log('🖼️ [ImageLoad] 이미지 URL:', imageState.value.actualImageUrl)
   // 이미지 로딩 상태를 false로 설정하여 부드러운 전환 효과 적용
   imageState.value.loading = false
+  console.log('🎨 [ImageLoad] 로딩 상태 해제 완료')
 }
 
 // 이미지 로드 실패 핸들러
 const handleImageError = () => {
-  console.warn('❌ [ThreadDetailView] 이미지 로드 실패')
+  console.error('❌ [ImageLoad] 이미지 로드 실패')
+  console.error('🖼️ [ImageLoad] 실패한 이미지 URL:', imageState.value.actualImageUrl)
   imageState.value.showActualImage = false
   imageState.value.hasError = true
+  console.log('🔄 [ImageLoad] 에러 상태로 전환 완료')
 }
 
 // 라우트 변경 감지 및 전환 상태 관리

@@ -95,4 +95,19 @@ export const threadsAPI = {
     const response = await api.post(`/api/threads/${threadId}/like/`)
     return response.data
   },
+
+  /**
+   * 여러 쓰레드의 좋아요 상태 조회 (실시간)
+   * @param {Array<number>} threadIds 쓰레드 ID 배열
+   * @returns {Promise} 좋아요 상태 맵 { threadId: { liked: boolean, likes_count: number } }
+   */
+  async getLikeStatus(threadIds) {
+    if (!threadIds || threadIds.length === 0) {
+      return {}
+    }
+    const response = await api.get('/api/threads/like_status/', {
+      params: { thread_ids: threadIds.join(',') },
+    })
+    return response.data
+  },
 }
