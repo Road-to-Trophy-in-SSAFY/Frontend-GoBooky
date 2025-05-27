@@ -32,6 +32,16 @@ export const booksAPI = {
   },
 
   /**
+   * 랜덤 도서 조회
+   * @param {number} count 조회할 도서 개수 (기본값: 10)
+   * @returns {Promise} 랜덤 도서 목록
+   */
+  async getRandomBooks(count = 10) {
+    const response = await api.get('/api/books/random/', { params: { count } })
+    return response.data
+  },
+
+  /**
    * 책 저장/해제 토글
    * @param {number} bookId 도서 ID
    * @returns {Promise} 토글 결과

@@ -31,6 +31,16 @@ export const threadsAPI = {
   },
 
   /**
+   * 인기 쓰레드 조회 (좋아요 순)
+   * @param {number} count 조회할 쓰레드 개수 (기본값: 3)
+   * @returns {Promise} 인기 쓰레드 목록
+   */
+  async getPopularThreads(count = 3) {
+    const response = await api.get('/api/threads/popular/', { params: { count } })
+    return response.data
+  },
+
+  /**
    * 쓰레드 생성
    * @param {Object} threadData 쓰레드 데이터
    * @param {number} threadData.book 도서 ID

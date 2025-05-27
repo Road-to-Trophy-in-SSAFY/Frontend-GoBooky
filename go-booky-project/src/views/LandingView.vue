@@ -33,16 +33,17 @@
             @swiper="onSwiper"
           >
             <swiper-slide v-for="book in books" :key="book.id" class="book-slide">
-              <div class="book-card">
+              <div class="book-card" @click="goToBookDetail(book.id)">
                 <div class="book-image-wrapper">
-                  <img :src="book.cover" :alt="book.title" class="book-image" />
+                  <img
+                    :src="book.cover || '/default-book-cover.jpg'"
+                    :alt="book.title"
+                    class="book-image"
+                    @error="handleImageError($event)"
+                  />
                   <div class="book-overlay">
                     <span class="view-details">자세히 보기</span>
                   </div>
-                </div>
-                <div class="book-info">
-                  <h3 class="book-title">{{ book.title }}</h3>
-                  <p class="book-author">{{ book.author }}</p>
                 </div>
               </div>
             </swiper-slide>
@@ -53,22 +54,41 @@
 
     <!-- Recommended Threads List -->
     <section class="recommended-threads">
-      <h2>추천 쓰레드</h2>
-      <ul>
-        <li v-for="thread in threads" :key="thread.id">{{ thread.title }}</li>
+      <h2>추천 글</h2>
+      <div v-if="isThreadLoading" class="loading">
+        <p>쓰레드를 불러오는 중...</p>
+      </div>
+      <ul v-else-if="threads.length > 0">
+        <li v-for="thread in threads" :key="thread.id" @click="goToThreadDetail(thread.id)">
+          <div class="thread-item">
+            <div class="thread-header">
+              <h3 class="thread-title">{{ thread.title }}</h3>
+              <span class="thread-likes">❤️ {{ thread.likes_count }}</span>
+            </div>
+            <p class="thread-book">- {{ thread.book_title }}</p>
+          </div>
+        </li>
       </ul>
+      <div v-else class="no-threads">
+        <p>아직 쓰레드가 없습니다.</p>
+      </div>
     </section>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Navigation } from 'swiper/modules'
 import 'swiper/css'
 import 'swiper/css/navigation'
 import { gsap } from 'gsap'
 import skrollr from 'skrollr'
+import { booksAPI } from '@/api/books'
+import { threadsAPI } from '@/api/threads'
+
+const router = useRouter()
 
 // Swiper modules
 const modules = [Navigation]
@@ -79,75 +99,55 @@ let swiperInstance = null
 let autoSlideTimeline = null
 let isHovered = false
 
-// 10권 책 데이터
-const books = ref([
-  {
-    id: 1,
-    cover: 'https://picsum.photos/seed/book1/150/200',
-    title: 'The Great Adventure',
-    author: 'Author A',
-  },
-  {
-    id: 2,
-    cover: 'https://picsum.photos/seed/book2/150/200',
-    title: 'Mystery of Time',
-    author: 'Author B',
-  },
-  {
-    id: 3,
-    cover: 'https://picsum.photos/seed/book3/150/200',
-    title: 'Digital Dreams',
-    author: 'Author C',
-  },
-  {
-    id: 4,
-    cover: 'https://picsum.photos/seed/book4/150/200',
-    title: 'Ocean Stories',
-    author: 'Author D',
-  },
-  {
-    id: 5,
-    cover: 'https://picsum.photos/seed/book5/150/200',
-    title: 'Mountain Journey',
-    author: 'Author E',
-  },
-  {
-    id: 6,
-    cover: 'https://picsum.photos/seed/book6/150/200',
-    title: 'City Lights',
-    author: 'Author F',
-  },
-  {
-    id: 7,
-    cover: 'https://picsum.photos/seed/book7/150/200',
-    title: 'Forest Whispers',
-    author: 'Author G',
-  },
-  {
-    id: 8,
-    cover: 'https://picsum.photos/seed/book8/150/200',
-    title: 'Space Odyssey',
-    author: 'Author H',
-  },
-  {
-    id: 9,
-    cover: 'https://picsum.photos/seed/book9/150/200',
-    title: 'Ancient Secrets',
-    author: 'Author I',
-  },
-  {
-    id: 10,
-    cover: 'https://picsum.photos/seed/book10/150/200',
-    title: 'Future Vision',
-    author: 'Author J',
-  },
-])
+// 데이터 상태
+const books = ref([])
+const threads = ref([])
+const isBookLoading = ref(false)
+const isThreadLoading = ref(false)
 
-const threads = ref([
-  { id: 1, title: 'Thread 1' },
-  { id: 2, title: 'Thread 2' },
-  { id: 3, title: 'Thread 3' },
-])
+// 랜덤 도서 데이터 가져오기
+const fetchRandomBooks = async () => {
+  try {
+    isBookLoading.value = true
+    const response = await booksAPI.getRandomBooks(10)
+    books.value = response
+  } catch (error) {
+    console.error('❌ [LandingView] 랜덤 도서 조회 실패:', error)
+    // 에러 시 빈 배열로 설정
+    books.value = []
+  } finally {
+    isBookLoading.value = false
+  }
+}
+
+// 인기 쓰레드 데이터 가져오기
+const fetchPopularThreads = async () => {
+  try {
+    isThreadLoading.value = true
+    const response = await threadsAPI.getPopularThreads(3)
+    threads.value = response
+  } catch (error) {
+    console.error('❌ [LandingView] 인기 쓰레드 조회 실패:', error)
+    // 에러 시 빈 배열로 설정
+    threads.value = []
+  } finally {
+    isThreadLoading.value = false
+  }
+}
+
+// 네비게이션 함수들
+const goToBookDetail = (bookId) => {
+  router.push(`/books/${bookId}`)
+}
+
+const goToThreadDetail = (threadId) => {
+  router.push(`/threads/${threadId}`)
+}
+
+// 이미지 에러 처리
+const handleImageError = (event) => {
+  event.target.src = '/default-book-cover.jpg'
+}
 
 function onSwiper(swiper) {
   swiperInstance = swiper
@@ -227,7 +227,10 @@ function setupMagneticHover() {
   })
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // API 데이터 가져오기
+  await Promise.all([fetchRandomBooks(), fetchPopularThreads()])
+
   skrollr.init()
 
   // 로고 애니메이션 향상
@@ -295,8 +298,6 @@ onUnmounted(() => {
 <style scoped>
 .landing-view {
   position: relative;
-  overflow-x: hidden;
-  overflow-y: auto;
   height: 100vh;
 }
 
@@ -414,11 +415,12 @@ onUnmounted(() => {
   backdrop-filter: blur(15px);
   border: 1px solid rgba(11, 61, 145, 0.12);
   width: 100%;
-  max-width: 160px;
+  max-width: 140px;
   cursor: pointer;
   transform-style: preserve-3d;
   perspective: 1000px;
   position: relative;
+  aspect-ratio: 3/4;
 }
 
 .book-card::before {
@@ -455,16 +457,20 @@ onUnmounted(() => {
 .book-image-wrapper {
   position: relative;
   overflow: hidden;
-  border-radius: 8px 8px 0 0;
+  border-radius: 12px;
   transform-style: preserve-3d;
   will-change: transform;
+  width: 100%;
+  height: 100%;
 }
 
 .book-image {
   width: 100%;
-  height: 160px;
+  height: 100%;
   object-fit: cover;
+  object-position: center;
   transition: transform 0.5s ease;
+  border-radius: 12px;
 }
 
 .book-overlay {
@@ -480,6 +486,7 @@ onUnmounted(() => {
   opacity: 0;
   transition: all 0.4s ease;
   backdrop-filter: none;
+  border-radius: 4px;
 }
 
 .book-card:hover .book-overlay {
@@ -511,45 +518,6 @@ onUnmounted(() => {
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
-.book-info {
-  padding: 1rem 0.8rem;
-  text-align: center;
-}
-
-.book-title {
-  font-family: 'Comfortaa', sans-serif;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #0b3d91;
-  margin: 0 0 0.4rem 0;
-  line-height: 1.2;
-  height: 2.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  transition: color 0.3s ease;
-}
-
-.book-card:hover .book-title {
-  color: #2879c8;
-}
-
-.book-author {
-  font-family: 'Ubuntu', sans-serif;
-  font-size: 0.75rem;
-  color: #666;
-  margin: 0;
-  font-weight: 400;
-  opacity: 0.8;
-  transition: all 0.3s ease;
-}
-
-.book-card:hover .book-author {
-  color: #555;
-  opacity: 1;
-}
-
 /* 추천 쓰레드 섹션 */
 .recommended-threads {
   padding: 3rem 1rem;
@@ -568,6 +536,20 @@ onUnmounted(() => {
   font-weight: 700;
 }
 
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  font-family: 'Ubuntu', sans-serif;
+}
+
+.no-threads {
+  text-align: center;
+  padding: 2rem;
+  color: #999;
+  font-family: 'Ubuntu', sans-serif;
+}
+
 .recommended-threads ul {
   list-style: none;
   padding: 0;
@@ -576,22 +558,88 @@ onUnmounted(() => {
 }
 
 .recommended-threads li {
-  padding: 1rem 1.5rem;
-  margin-bottom: 0.5rem;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
   border-radius: 12px;
   background: white;
-  box-shadow: 0 2px 8px rgba(11, 61, 145, 0.08);
+  box-shadow: 0 4px 12px rgba(11, 61, 145, 0.1);
   font-family: 'Ubuntu', sans-serif;
-  color: #333;
   transition: all 0.3s ease;
   border-left: 4px solid #2879c8;
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.recommended-threads li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(40, 121, 200, 0.05), transparent);
+  transition: left 0.5s;
+}
+
+.recommended-threads li:hover::before {
+  left: 100%;
 }
 
 .recommended-threads li:hover {
-  transform: translateX(8px);
-  box-shadow: 0 4px 16px rgba(11, 61, 145, 0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(11, 61, 145, 0.15);
   background: #f8faff;
+  border-left-color: #0b3d91;
+}
+
+.thread-item {
+  position: relative;
+  z-index: 1;
+}
+
+.thread-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.thread-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #0b3d91;
+  margin: 0;
+  line-height: 1.3;
+  transition: color 0.3s ease;
+}
+
+.recommended-threads li:hover .thread-title {
+  color: #2879c8;
+}
+
+.thread-book {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0;
+  font-weight: 400;
+}
+
+.thread-likes {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #e74c3c;
+  font-weight: 500;
+  padding: 0.2rem 0.6rem;
+  background: rgba(231, 76, 60, 0.1);
+  border-radius: 15px;
+  transition: all 0.3s ease;
+}
+
+.recommended-threads li:hover .thread-likes {
+  background: rgba(231, 76, 60, 0.15);
+  transform: scale(1.05);
 }
 
 /* 반응형 디자인 */
@@ -606,20 +654,7 @@ onUnmounted(() => {
   }
 
   .book-card {
-    max-width: 140px;
-  }
-
-  .book-image {
-    height: 140px;
-  }
-
-  .book-title {
-    font-size: 0.8rem;
-    height: 2rem;
-  }
-
-  .book-author {
-    font-size: 0.7rem;
+    max-width: 120px;
   }
 
   .view-details {

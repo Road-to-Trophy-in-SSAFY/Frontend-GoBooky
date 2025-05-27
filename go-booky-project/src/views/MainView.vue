@@ -6,8 +6,8 @@
         <!-- 로고 및 브랜드 -->
         <div class="nav-brand">
           <RouterLink :to="{ name: 'home' }" class="brand-link">
-            <img src="/logo.png" alt="GoBooky Logo" class="logo" />
-            <span class="brand-text">GoBooky</span>
+            <img v-if="!isHomePage" src="/logo.png" alt="GoBooky Logo" class="logo" />
+            <span v-if="isHomePage" class="brand-text"> GoBooky </span>
           </RouterLink>
         </div>
 
@@ -416,8 +416,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter, RouterLink, RouterView } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter, useRoute, RouterLink, RouterView } from 'vue-router'
 import Modal from '@/components/ui/Modal.vue'
 import DeleteAccountModal from '@/components/ui/DeleteAccountModal.vue'
 import { useAuth } from '@/composables/useAuth'
@@ -428,10 +428,16 @@ import { toast } from '@/composables/useToast'
 // 지침에 따른 Composables 사용
 const { user, isAuthenticated, logout } = useAuth()
 const router = useRouter()
+const route = useRoute()
 const modalText = ref('')
 const showDeleteModal = ref(false)
 const isDeleting = ref(false)
 const deleteModalRef = ref(null)
+
+// 홈 페이지 여부 확인
+const isHomePage = computed(() => {
+  return route.name === 'home' || route.path === '/'
+})
 
 // 모바일 메뉴 상태
 const isMobileMenuOpen = ref(false)
