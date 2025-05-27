@@ -204,55 +204,127 @@
       class="thread-modal"
     >
       <div class="thread-write-form">
-        <div v-if="book" class="selected-book-info">
-          <div class="selected-book-cover">
-            <img :src="bookCover" :alt="`${book.title} 표지`" />
+        <!-- 선택된 책 정보 헤더 -->
+        <div v-if="book" class="selected-book-header">
+          <div class="book-info-card">
+            <div class="book-cover-mini">
+              <img :src="bookCover" :alt="`${book.title} 표지`" />
+              <div class="book-badge">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M19 21L12 16L5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div class="book-meta">
+              <h4 class="book-title-mini">{{ book.title }}</h4>
+              <p class="book-author-mini">{{ book.author }}</p>
+              <div class="book-category">
+                <span class="category-tag">{{ book.category_name || '미분류' }}</span>
+              </div>
+            </div>
           </div>
-          <div class="selected-book-details">
-            <h4 class="selected-book-title">{{ book.title }}</h4>
-            <p class="selected-book-author">{{ book.author }}</p>
+          <div class="form-progress">
+            <div class="progress-steps">
+              <div class="step" :class="{ active: threadForm.title.trim() || currentStep === 1 }">
+                <span class="step-number">1</span>
+                <span class="step-label">제목</span>
+              </div>
+              <div class="step" :class="{ active: threadForm.reading_date || currentStep === 2 }">
+                <span class="step-number">2</span>
+                <span class="step-label">날짜</span>
+              </div>
+              <div class="step" :class="{ active: threadForm.content.trim() || currentStep === 3 }">
+                <span class="step-number">3</span>
+                <span class="step-label">후기</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="form-layout">
-          <div class="form-left">
-            <div class="form-group">
-              <label for="title" class="form-label">
-                <span class="label-icon">📝</span>
-                제목
-              </label>
-              <input
-                id="title"
-                v-model="threadForm.title"
-                type="text"
-                required
-                placeholder="독서 기록의 제목을 입력하세요"
-                class="form-input"
-              />
+        <!-- 메인 폼 영역 -->
+        <div class="form-main">
+          <!-- 기본 정보 섹션 -->
+          <div class="form-section basic-info">
+            <div class="section-header">
+              <h5 class="section-title">
+                <span class="section-icon">📋</span>
+                기본 정보
+              </h5>
             </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="title" class="form-label">
+                  <span class="label-icon">📝</span>
+                  제목
+                  <span class="required">*</span>
+                </label>
+                <input
+                  id="title"
+                  v-model="threadForm.title"
+                  type="text"
+                  required
+                  placeholder="이 책을 읽고 느낀 점을 한 줄로 표현해보세요"
+                  class="form-input"
+                  maxlength="100"
+                  @focus="currentStep = 1"
+                  @blur="currentStep = 0"
+                />
+                <div class="input-helper">
+                  <span class="char-count">{{ threadForm.title.length }}/100</span>
+                </div>
+              </div>
 
-            <div class="form-group">
-              <label for="reading_date" class="form-label">
-                <span class="label-icon">📅</span>
-                독서 완료일
-              </label>
-              <input
-                id="reading_date"
-                v-model="threadForm.reading_date"
-                type="date"
-                required
-                :max="today"
-                class="form-input"
-              />
+              <div class="form-group">
+                <label for="reading_date" class="form-label">
+                  <span class="label-icon">📅</span>
+                  독서 완료일
+                  <span class="required">*</span>
+                </label>
+                <input
+                  id="reading_date"
+                  v-model="threadForm.reading_date"
+                  type="date"
+                  required
+                  :max="today"
+                  class="form-input"
+                  @focus="currentStep = 2"
+                  @blur="currentStep = 0"
+                />
+                <div class="input-helper">
+                  <span class="date-helper">언제 이 책을 다 읽으셨나요?</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="form-right">
-            <div class="form-group content-group">
-              <label for="content" class="form-label">
-                <span class="label-icon">✍️</span>
+          <!-- 독서 후기 섹션 -->
+          <div class="form-section content-section">
+            <div class="section-header">
+              <h5 class="section-title">
+                <span class="section-icon">✍️</span>
                 독서 후기
-              </label>
+                <span class="required">*</span>
+              </h5>
+              <div class="section-tips">
+                <div class="tip-item">
+                  🎨 AI 이미지 생성을 위해 구체적인 장면 묘사를 포함해보세요
+                </div>
+                <div class="tip-item">💡 인상 깊었던 구절이나 감정을 상세히 표현해주세요</div>
+                <div class="tip-item">
+                  🌟 책의 분위기나 색감을 언급하면 더 생생한 이미지가 만들어집니다
+                </div>
+              </div>
+            </div>
+            <div class="editor-wrapper">
               <QuillEditor
                 v-model:content="threadForm.content"
                 contentType="html"
@@ -260,36 +332,117 @@
                 toolbar="essential"
                 :options="editorOptions"
                 class="editor-container"
+                @focus="currentStep = 3"
+                @blur="currentStep = 0"
               />
+              <div class="editor-footer">
+                <div class="editor-tips">
+                  <span class="tip"
+                    >🎨 AI 이미지 생성 팁: 책의 핵심 장면, 감정, 색감을 구체적으로 묘사하면 더
+                    생생한 이미지가 생성됩니다</span
+                  >
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
+        <!-- 액션 버튼 -->
         <div class="form-actions">
-          <button
-            type="button"
-            @click="showWriteModal = false"
-            :disabled="isLoading"
-            class="cancel-btn"
-          >
-            <span class="btn-icon">❌</span>
-            취소
-          </button>
-          <button
-            type="button"
-            @click="submitThread"
-            :disabled="isLoading || !isFormValid"
-            class="submit-btn"
-          >
-            <span v-if="!isLoading" class="submit-text">
-              <span class="btn-icon">✅</span>
-              작성하기
-            </span>
-            <span v-else class="loading-text">
-              <div class="submit-spinner"></div>
-              작성 중...
-            </span>
-          </button>
+          <div class="action-left">
+            <div class="form-validation">
+              <div v-if="!isFormValid" class="validation-message">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span>모든 필수 항목을 입력해주세요</span>
+              </div>
+              <div v-else class="validation-message success">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span>작성 준비 완료!</span>
+              </div>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button
+              type="button"
+              @click="showWriteModal = false"
+              :disabled="isLoading"
+              class="cancel-btn"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M18 6L6 18M6 6L18 18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <span>취소</span>
+            </button>
+            <button
+              type="button"
+              @click="submitThread"
+              :disabled="isLoading || !isFormValid"
+              class="submit-btn"
+            >
+              <span v-if="!isLoading" class="submit-content">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 19L19 12L12 5M19 12H5"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span>독서 기록 작성하기</span>
+              </span>
+              <span v-else class="loading-content">
+                <div class="submit-spinner"></div>
+                <span>작성 중...</span>
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -331,6 +484,7 @@ const isBookLoading = ref(false)
 const isSaveLoading = ref(false)
 const today = new Date().toISOString().split('T')[0]
 const imageError = ref(false)
+const currentStep = ref(0)
 
 // 인증 상태
 const isAuthenticated = computed(() => authStore.isAuthenticated)
@@ -368,7 +522,7 @@ const formatDate = (dateString) => {
 const threadForm = ref({
   title: '',
   content: '',
-  reading_date: today,
+  reading_date: '',
   book: '',
 })
 
@@ -390,7 +544,8 @@ const editorOptions = {
       ['clean'],
     ],
   },
-  placeholder: '독서 후 느낀 점이나 인상 깊었던 내용을 자유롭게 작성해보세요...',
+  placeholder:
+    '이 책을 읽고 느낀 점을 자유롭게 작성해보세요... (AI 이미지 생성을 위해 구체적인 장면이나 감정을 포함해주세요)',
 }
 
 // 로그인 페이지로 이동
@@ -994,205 +1149,437 @@ const submitThread = async () => {
 
 /* 모달 스타일 */
 .thread-modal {
-  max-width: 1000px;
+  max-width: 1200px;
   width: 95vw;
 }
 
 .thread-write-form {
   display: flex;
   flex-direction: column;
-  gap: 32px;
-  padding: 8px;
+  gap: 0;
+  padding: 0;
 }
 
-.selected-book-info {
+/* 선택된 책 정보 헤더 */
+.selected-book-header {
   display: flex;
-  gap: 20px;
-  padding: 24px;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  margin: -32px -32px 0 -32px;
+  border-radius: 16px 16px 0 0;
 }
 
-.selected-book-cover {
+.book-info-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.book-cover-mini {
+  position: relative;
   flex-shrink: 0;
 }
 
-.selected-book-cover img {
-  width: 80px;
-  height: 110px;
+.book-cover-mini img {
+  width: 60px;
+  height: 80px;
   object-fit: cover;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
-.selected-book-details {
-  flex: 1;
+.book-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 4px;
+  color: #667eea;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-.selected-book-title {
+.book-meta {
+  flex: 1;
+}
+
+.book-title-mini {
   font-size: 18px;
   font-weight: 700;
-  color: #1e293b;
-  margin: 0;
+  margin: 0 0 4px 0;
   line-height: 1.3;
+  color: white;
 }
 
-.selected-book-author {
-  font-size: 15px;
-  color: #64748b;
-  margin: 0;
+.book-author-mini {
+  font-size: 14px;
+  margin: 0 0 8px 0;
+  color: rgba(255, 255, 255, 0.8);
   font-weight: 500;
 }
 
-/* 폼 레이아웃 */
-.form-layout {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
+.book-category {
+  display: flex;
+  gap: 8px;
+}
+
+.category-tag {
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* 진행 상황 표시 */
+.form-progress {
+  display: flex;
+  align-items: center;
+}
+
+.progress-steps {
+  display: flex;
+  gap: 16px;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.5;
+  transition: all 0.3s ease;
+}
+
+.step.active {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.step-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.step.active .step-number {
+  background: white;
+  color: #667eea;
+  border-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.step-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  text-align: center;
+}
+
+/* 메인 폼 영역 */
+.form-main {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
   gap: 32px;
-  min-height: 400px;
 }
 
-.form-left {
+/* 폼 섹션 */
+.form-section {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.form-section:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.section-header {
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.section-title {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 12px 0;
+}
+
+.section-icon {
+  font-size: 20px;
+}
+
+.required {
+  color: #ef4444;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.section-tips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tip-item {
+  padding: 6px 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 20px;
+  font-size: 13px;
+  color: #1e40af;
+  font-weight: 500;
+}
+
+/* 기본 정보 섹션 */
+.basic-info {
+  margin-bottom: 8px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 24px;
-}
-
-.form-right {
-  display: flex;
-  flex-direction: column;
+  padding: 24px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.content-group {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  gap: 8px;
 }
 
 .form-label {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 16px;
-  font-weight: 700;
-  color: #1e293b;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
   margin-bottom: 4px;
 }
 
 .label-icon {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .form-input {
-  padding: 16px 20px;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  font-size: 16px;
+  padding: 14px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 15px;
   transition: all 0.3s ease;
   background: white;
   font-weight: 500;
+  color: #1f2937;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
   transform: translateY(-1px);
+}
+
+.form-input::placeholder {
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+.input-helper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.char-count {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.date-helper {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* 콘텐츠 섹션 */
+.content-section {
+  flex: 1;
+}
+
+.editor-wrapper {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 500px;
 }
 
 .editor-container {
-  border: 2px solid #e2e8f0;
+  border: 2px solid #e5e7eb;
   border-radius: 12px;
   overflow: hidden;
   transition: all 0.3s ease;
-  flex: 1;
-  min-height: 300px;
+  min-height: 450px;
+  background: white;
 }
 
 .editor-container:focus-within {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
   transform: translateY(-1px);
 }
 
+.editor-footer {
+  margin-top: 8px;
+}
+
+.editor-tips {
+  padding: 12px 16px;
+  background: #f0f9ff;
+  border-radius: 8px;
+  border-left: 4px solid #0ea5e9;
+}
+
+.editor-tips .tip {
+  font-size: 13px;
+  color: #0c4a6e;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* 액션 영역 */
 .form-actions {
   display: flex;
-  gap: 16px;
-  justify-content: flex-end;
-  padding-top: 24px;
-  border-top: 1px solid #e2e8f0;
-  margin-top: 8px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  margin: 0 -32px -32px -32px;
+  border-radius: 0 0 16px 16px;
+}
+
+.action-left {
+  flex: 1;
+}
+
+.form-validation {
+  display: flex;
+  align-items: center;
+}
+
+.validation-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.validation-message.success {
+  background: #f0fdf4;
+  color: #16a34a;
+  border-color: #bbf7d0;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
 }
 
 .cancel-btn,
 .submit-btn {
-  padding: 16px 32px;
-  border-radius: 12px;
-  font-weight: 700;
-  font-size: 16px;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 15px;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 140px;
+  gap: 8px;
+  min-width: 120px;
   justify-content: center;
-}
-
-.btn-icon {
-  font-size: 16px;
+  border: 2px solid transparent;
 }
 
 .cancel-btn {
   background: white;
-  color: #64748b;
-  border: 2px solid #e2e8f0;
+  color: #6b7280;
+  border-color: #d1d5db;
 }
 
 .cancel-btn:hover:not(:disabled) {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: #f9fafb;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .submit-btn {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
+  position: relative;
+  overflow: hidden;
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
 }
 
 .submit-btn:disabled {
-  background: #e2e8f0;
-  color: #94a3b8;
+  background: #e5e7eb;
+  color: #9ca3af;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
-.submit-text,
-.loading-text {
+.submit-content,
+.loading-content {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .submit-spinner {
@@ -1349,6 +1736,75 @@ const submitThread = async () => {
     text-align: center;
   }
 
+  /* 모달 반응형 - 태블릿 */
+  .thread-modal {
+    width: 98vw;
+    max-width: none;
+  }
+
+  .selected-book-header {
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px 24px;
+    margin: -24px -24px 0 -24px;
+  }
+
+  .book-info-card {
+    justify-content: center;
+  }
+
+  .progress-steps {
+    gap: 12px;
+  }
+
+  .form-main {
+    padding: 24px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px;
+  }
+
+  .section-header {
+    padding: 16px 20px;
+  }
+
+  .section-title {
+    font-size: 16px;
+  }
+
+  .editor-wrapper {
+    padding: 20px;
+    min-height: 450px;
+  }
+
+  .editor-container {
+    min-height: 400px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 24px;
+    margin: 0 -24px -24px -24px;
+  }
+
+  .action-left {
+    order: 2;
+  }
+
+  .action-buttons {
+    order: 1;
+    width: 100%;
+  }
+
+  .cancel-btn,
+  .submit-btn {
+    flex: 1;
+  }
+
   .book-meta {
     gap: 12px;
   }
@@ -1456,6 +1912,133 @@ const submitThread = async () => {
     font-size: 15px;
   }
 
+  /* 모달 반응형 - 모바일 */
+  .selected-book-header {
+    padding: 16px 20px;
+    margin: -20px -20px 0 -20px;
+  }
+
+  .book-cover-mini img {
+    width: 50px;
+    height: 70px;
+  }
+
+  .book-badge {
+    width: 20px;
+    height: 20px;
+    top: -4px;
+    right: -4px;
+  }
+
+  .book-badge svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .book-title-mini {
+    font-size: 16px;
+  }
+
+  .book-author-mini {
+    font-size: 13px;
+  }
+
+  .category-tag {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  .step-number {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+  }
+
+  .step-label {
+    font-size: 10px;
+  }
+
+  .form-main {
+    padding: 20px;
+  }
+
+  .section-header {
+    padding: 14px 16px;
+  }
+
+  .section-title {
+    font-size: 15px;
+  }
+
+  .section-tips {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .tip-item {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .form-row {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .form-label {
+    font-size: 14px;
+  }
+
+  .form-input {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .input-helper {
+    margin-top: 2px;
+  }
+
+  .char-count,
+  .date-helper {
+    font-size: 11px;
+  }
+
+  .editor-wrapper {
+    padding: 16px;
+    min-height: 400px;
+  }
+
+  .editor-container {
+    min-height: 350px;
+  }
+
+  .editor-tips {
+    padding: 10px 12px;
+  }
+
+  .editor-tips .tip {
+    font-size: 12px;
+  }
+
+  .form-actions {
+    padding: 16px 20px;
+    margin: 0 -20px -20px -20px;
+  }
+
+  .validation-message {
+    padding: 6px 12px;
+    font-size: 13px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .cancel-btn,
+  .submit-btn {
+    padding: 10px 20px;
+    font-size: 14px;
+    min-width: 100px;
+  }
+
   .audio-player {
     height: 44px;
   }
@@ -1527,5 +2110,51 @@ const submitThread = async () => {
   border-radius: 20px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+</style>
+
+<style>
+/* QuillEditor 전역 스타일 - scoped 없이 적용 */
+.editor-container .ql-container {
+  min-height: 380px !important;
+  font-size: 15px;
+}
+
+.editor-container .ql-editor {
+  min-height: 380px !important;
+  padding: 20px !important;
+  line-height: 1.6 !important;
+  font-size: 15px;
+}
+
+.editor-container .ql-toolbar {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 16px;
+}
+
+/* 태블릿 반응형 */
+@media (max-width: 768px) {
+  .editor-container .ql-container {
+    min-height: 330px !important;
+  }
+
+  .editor-container .ql-editor {
+    min-height: 330px !important;
+    padding: 18px !important;
+    font-size: 14px;
+  }
+}
+
+/* 모바일 반응형 */
+@media (max-width: 480px) {
+  .editor-container .ql-container {
+    min-height: 280px !important;
+  }
+
+  .editor-container .ql-editor {
+    min-height: 280px !important;
+    padding: 16px !important;
+    font-size: 14px;
+  }
 }
 </style>
