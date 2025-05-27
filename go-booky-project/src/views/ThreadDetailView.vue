@@ -1,10 +1,78 @@
 <!-- 쓰레드 상세 보기 -->
 <template>
   <div v-if="thread && thread.id === currentThreadId && !isTransitioning" class="thread-detail">
-    <h2>{{ thread.title }}</h2>
+    <!-- 헤더 섹션 -->
+    <div class="thread-header">
+      <div class="header-content">
+        <div class="breadcrumb">
+          <router-link to="/threads" class="breadcrumb-link">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M19 12H5M12 19L5 12L12 5"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            독서 기록 목록
+          </router-link>
+          <span class="breadcrumb-separator">></span>
+          <span class="breadcrumb-current">{{ thread.title }}</span>
+        </div>
 
-    <!-- 쓰레드 이미지 표시 -->
-    <div class="thread-image">
+        <h1 class="thread-title">{{ thread.title }}</h1>
+
+        <!-- 메타 정보 -->
+        <div class="thread-meta">
+          <div class="meta-item">
+            <div class="meta-icon">📚</div>
+            <div class="meta-content">
+              <span class="meta-label">도서</span>
+              <router-link
+                :to="{ name: 'book-detail', params: { id: thread.book.id } }"
+                class="book-link"
+              >
+                {{ thread.book.title }}
+              </router-link>
+            </div>
+          </div>
+
+          <div class="meta-item">
+            <div class="meta-icon">👤</div>
+            <div class="meta-content">
+              <span class="meta-label">작성자</span>
+              <span class="meta-value">{{ thread.user?.username || '익명' }}</span>
+            </div>
+          </div>
+
+          <div class="meta-item">
+            <div class="meta-icon">📅</div>
+            <div class="meta-content">
+              <span class="meta-label">독서 완료일</span>
+              <span class="meta-value">{{ formatDate(thread.reading_date) }}</span>
+            </div>
+          </div>
+
+          <div class="meta-item">
+            <div class="meta-icon">🕒</div>
+            <div class="meta-content">
+              <span class="meta-label">작성일</span>
+              <span class="meta-value">{{ formatDate(thread.created_at) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 이미지 섹션 -->
+    <div class="thread-image-section">
       <!-- AI 이미지 생성 중 -->
       <div v-if="imageState.isGenerating" class="image-placeholder generating">
         <div class="loading-spinner ai-generating"></div>
@@ -48,30 +116,125 @@
       </div>
     </div>
 
-    <p>책: {{ thread.book.title }}</p>
-    <p>작성일: {{ formatDate(thread.created_at) }}</p>
-    <p>독서일: {{ formatDate(thread.reading_date) }}</p>
-    <div class="content" v-html="thread.content"></div>
+    <!-- 콘텐츠 섹션 -->
+    <div class="thread-content-section">
+      <div class="content-header">
+        <h2 class="content-title">
+          <span class="content-icon">📖</span>
+          독서 후기
+        </h2>
+      </div>
+      <div class="content" v-html="thread.content"></div>
+    </div>
 
-    <div class="actions">
-      <button
-        @click="handleLikeThread"
-        class="like-button"
-        :class="{ liked: isLiked, animate: isAnimating(route.params.id) }"
-        :aria-label="isLiked ? '좋아요 취소' : '좋아요'"
-        :aria-pressed="isLiked"
-        type="button"
-      >
-        <Transition name="heart" mode="out-in">
-          <span v-if="isLiked" key="filled" class="heart-icon filled" aria-hidden="true">❤️</span>
-          <span v-else key="empty" class="heart-icon empty" aria-hidden="true">🤍</span>
-        </Transition>
-        <Transition name="count" mode="out-in">
-          <span :key="likesCount" class="like-count">{{ likesCount }}</span>
-        </Transition>
-      </button>
-      <button v-if="isThreadOwner" @click="showEditModal = true" class="edit-btn">수정</button>
-      <button v-if="isThreadOwner" @click="showDeleteModal = true" class="delete-btn">삭제</button>
+    <!-- 액션 섹션 -->
+    <div class="thread-actions">
+      <div class="action-group primary">
+        <button
+          @click="handleLikeThread"
+          class="action-btn like-button"
+          :class="{ liked: isLiked, animate: isAnimating(route.params.id) }"
+          :aria-label="isLiked ? '좋아요 취소' : '좋아요'"
+          :aria-pressed="isLiked"
+          type="button"
+        >
+          <Transition name="heart" mode="out-in">
+            <span v-if="isLiked" key="filled" class="heart-icon filled" aria-hidden="true">❤️</span>
+            <span v-else key="empty" class="heart-icon empty" aria-hidden="true">🤍</span>
+          </Transition>
+          <Transition name="count" mode="out-in">
+            <span :key="likesCount" class="like-count">{{ likesCount }}</span>
+          </Transition>
+          <span class="action-text">{{ isLiked ? '좋아요 취소' : '좋아요' }}</span>
+        </button>
+
+        <button class="action-btn share-button" @click="shareThread">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M4 12V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V12"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M16 6L12 2L8 6"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M12 2V15"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span class="action-text">공유하기</span>
+        </button>
+      </div>
+
+      <div v-if="isThreadOwner" class="action-group secondary">
+        <button @click="showEditModal = true" class="action-btn edit-btn">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M18.5 2.50023C18.8978 2.1024 19.4374 1.87891 20 1.87891C20.5626 1.87891 21.1022 2.1024 21.5 2.50023C21.8978 2.89805 22.1213 3.43762 22.1213 4.00023C22.1213 4.56284 21.8978 5.1024 21.5 5.50023L12 15.0002L8 16.0002L9 12.0002L18.5 2.50023Z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span class="action-text">수정</span>
+        </button>
+
+        <button @click="showDeleteModal = true" class="action-btn delete-btn">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M3 6H5H21"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span class="action-text">삭제</span>
+        </button>
+      </div>
     </div>
 
     <!-- 수정 모달 -->
@@ -567,6 +730,30 @@ const handleLikeThread = async () => {
   }
 }
 
+// 공유 기능
+const shareThread = async () => {
+  try {
+    const shareData = {
+      title: `${thread.value.title} - GoBooky`,
+      text: `"${thread.value.book.title}"에 대한 독서 기록을 확인해보세요!`,
+      url: window.location.href,
+    }
+
+    if (navigator.share) {
+      await navigator.share(shareData)
+      console.log('✅ [ThreadDetailView] 공유 성공')
+    } else {
+      // Web Share API를 지원하지 않는 경우 클립보드에 복사
+      await navigator.clipboard.writeText(window.location.href)
+      showErrorToast('링크가 클립보드에 복사되었습니다!')
+      console.log('✅ [ThreadDetailView] 링크 복사 성공')
+    }
+  } catch (error) {
+    console.error('❌ [ThreadDetailView] 공유 실패:', error)
+    showErrorToast('공유에 실패했습니다.')
+  }
+}
+
 onMounted(async () => {
   // 컴포넌트 마운트 시 ID 유효성 검사
   const threadId = parseInt(route.params.id)
@@ -600,10 +787,15 @@ onUnmounted(() => {
 
 <style scoped>
 .thread-detail {
-  padding: 20px;
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
+  padding: 0;
   animation: fadeInUp 0.3s ease-out;
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #f1f3f4;
 }
 
 @keyframes fadeInUp {
@@ -617,9 +809,180 @@ onUnmounted(() => {
   }
 }
 
-.thread-image {
-  margin: 20px 0;
+/* 헤더 섹션 */
+.thread-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.thread-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+  opacity: 0.3;
+}
+
+.header-content {
+  position: relative;
+  z-index: 1;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.breadcrumb-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  transition: all 0.3s ease;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.breadcrumb-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.breadcrumb-separator {
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+.breadcrumb-current {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-title {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0 0 24px 0;
+  line-height: 1.2;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.thread-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.meta-item:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.meta-icon {
+  font-size: 20px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.meta-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.meta-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.meta-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+}
+
+.book-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.book-link:hover {
+  color: #ffd700;
+  border-bottom-color: #ffd700;
+}
+
+/* 이미지 섹션 */
+.thread-image-section {
+  padding: 40px;
   text-align: center;
+  background: #fafbfc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* 콘텐츠 섹션 */
+.thread-content-section {
+  padding: 40px;
+}
+
+.content-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f1f3f4;
+}
+
+.content-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.content-icon {
+  font-size: 28px;
 }
 
 .cover-image {
@@ -832,52 +1195,115 @@ onUnmounted(() => {
 }
 
 .content {
-  margin: 20px 0;
+  font-size: 16px;
+  line-height: 1.8;
+  color: #374151;
   white-space: pre-line;
-  line-height: 1.6;
 }
 
-.actions {
-  margin-top: 20px;
+/* 액션 섹션 */
+.thread-actions {
+  padding: 32px 40px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
   display: flex;
-  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.actions button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
+.action-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
   cursor: pointer;
+  transition: all 0.3s ease;
+  background: white;
+  color: #64748b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.action-text {
+  font-weight: 600;
 }
 
 /* 좋아요 버튼 스타일 */
 .like-button {
-  background-color: #f8f9fa;
-  border: 2px solid #dee2e6;
-  color: #495057;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s ease;
+  border-color: #e2e8f0;
+  color: #64748b;
   position: relative;
   overflow: hidden;
 }
 
 .like-button:hover {
-  background-color: #e9ecef;
-  border-color: #adb5bd;
-  transform: translateY(-1px);
+  border-color: #cbd5e1;
+  color: #475569;
 }
 
 .like-button.liked {
-  background-color: #fff5f5;
-  border-color: #fc8181;
-  color: #e53e3e;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border-color: #fca5a5;
+  color: #dc2626;
 }
 
 .like-button.liked:hover {
-  background-color: #fed7d7;
-  border-color: #f56565;
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border-color: #f87171;
+}
+
+/* 공유 버튼 */
+.share-button {
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+.share-button:hover {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-color: #7dd3fc;
+  color: #0369a1;
+}
+
+/* 수정 버튼 */
+.edit-btn {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.edit-btn:hover {
+  background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+  border-color: #d97706;
+  color: #78350f;
+}
+
+/* 삭제 버튼 */
+.delete-btn {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.delete-btn:hover {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border-color: #f87171;
+  color: #b91c1c;
 }
 
 /* 클릭 애니메이션 */
@@ -957,14 +1383,76 @@ onUnmounted(() => {
   transform: translateY(0) scale(1);
 }
 
-.edit-btn {
-  background-color: #f39c12;
-  color: white;
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .thread-header {
+    padding: 24px;
+  }
+
+  .thread-title {
+    font-size: 24px;
+  }
+
+  .thread-meta {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .meta-item {
+    padding: 12px;
+  }
+
+  .thread-image-section,
+  .thread-content-section {
+    padding: 24px;
+  }
+
+  .thread-actions {
+    padding: 24px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .action-group {
+    justify-content: center;
+  }
+
+  .action-btn {
+    flex: 1;
+    justify-content: center;
+  }
 }
 
-.delete-btn {
-  background-color: #e74c3c;
-  color: white;
+@media (max-width: 480px) {
+  .thread-header {
+    padding: 20px;
+  }
+
+  .thread-title {
+    font-size: 20px;
+  }
+
+  .breadcrumb-current {
+    max-width: 150px;
+  }
+
+  .thread-image-section,
+  .thread-content-section {
+    padding: 20px;
+  }
+
+  .thread-actions {
+    padding: 20px;
+  }
+
+  .action-group {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .action-btn {
+    width: 100%;
+  }
 }
 
 /* 수정 폼 스타일 */
