@@ -37,23 +37,47 @@
         </div>
 
         <div class="profile-info-section">
-          <h2 class="username">{{ profile.username }}</h2>
-          <div class="follow-stats">
-            <span class="stat-item">팔로워 {{ profile.followers_count || 0 }}</span>
-            <span class="stat-divider">·</span>
-            <span class="stat-item">팔로잉 {{ profile.following_count || 0 }}</span>
+          <div class="profile-header">
+            <h2 class="username">{{ profile.username }}</h2>
+            <!-- 팔로우 버튼 (다른 사용자 프로필일 때만) - 우측 상단 배치 -->
+            <button
+              v-if="!isOwnProfile && auth.isAuthenticated"
+              @click="toggleFollow"
+              :disabled="followLoading"
+              class="follow-button"
+              :class="{
+                following: profile.is_following,
+                loading: followLoading,
+              }"
+              :aria-label="
+                profile.is_following
+                  ? `${profile.username} 팔로우 해제`
+                  : `${profile.username} 팔로우`
+              "
+              :aria-pressed="profile.is_following"
+              type="button"
+            >
+              <span v-if="followLoading" class="loading-spinner"></span>
+              <span v-else class="follow-icon">
+                {{ profile.is_following ? '👥' : '➕' }}
+              </span>
+              <span class="follow-text">
+                {{ profile.is_following ? '팔로우 해제' : '팔로우' }}
+              </span>
+            </button>
           </div>
 
-          <!-- 팔로우 버튼 (다른 사용자 프로필일 때만) -->
-          <button
-            v-if="!isOwnProfile && auth.isAuthenticated"
-            @click="toggleFollow"
-            :disabled="followLoading"
-            class="follow-button"
-            :class="{ following: profile.is_following }"
-          >
-            {{ profile.is_following ? '팔로우 해제' : '팔로우' }}
-          </button>
+          <div class="follow-stats">
+            <div class="stat-item">
+              <span class="stat-number">{{ profile.followers_count || 0 }}</span>
+              <span class="stat-label">팔로워</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-number">{{ profile.following_count || 0 }}</span>
+              <span class="stat-label">팔로잉</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -253,6 +277,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProfile } from '@/composables/useProfile'
+import { useFollow } from '@/composables/useFollow'
 import api from '@/api'
 
 // 컴포넌트 임포트
@@ -270,7 +295,7 @@ const loading = ref(true)
 const error = ref(null)
 const profile = ref(null)
 const isEditing = ref(false)
-const followLoading = ref(false)
+// followLoading은 useFollow composable에서 가져옴
 const saveLoading = ref(false)
 const activeTab = ref('books')
 const imageError = ref(false)
@@ -293,6 +318,9 @@ const toastType = ref('success')
 // 프로필 composable
 const username = computed(() => route.params.username)
 const profileComposable = useProfile(username)
+
+// 팔로우 composable
+const { isLoading: followLoading, toggleFollow: toggleFollowAction } = useFollow()
 
 const {
   userBooks,
@@ -379,20 +407,7 @@ const toggleFollow = async () => {
     return
   }
 
-  try {
-    followLoading.value = true
-    const response = await api.post(`/auth/auth/profile/${username.value}/follow/`)
-
-    profile.value.is_following = response.data.is_following
-    profile.value.followers_count = response.data.followers_count
-
-    showToast(response.data.is_following ? '팔로우 했습니다.' : '팔로우를 해제했습니다.', 'success')
-  } catch (err) {
-    console.error('❌ 팔로우 처리 실패:', err)
-    showToast('팔로우 처리에 실패했습니다.', 'error')
-  } finally {
-    followLoading.value = false
-  }
+  await toggleFollowAction(profile.value, username.value)
 }
 
 const toggleEditMode = () => {
@@ -821,6 +836,15 @@ watch(
   margin-bottom: 1.5rem;
 }
 
+/* 프로필 헤더 (사용자명 + 팔로우 버튼) */
+.profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  width: 100%;
+}
+
 .avatar-container {
   position: relative;
   width: 120px;
@@ -848,6 +872,14 @@ watch(
   text-transform: uppercase;
 }
 
+.username {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0;
+  flex: 1;
+}
+
 .profile-username {
   font-size: 1.8rem;
   font-weight: 700;
@@ -855,27 +887,61 @@ watch(
   margin-bottom: 0.5rem;
 }
 
+/* 팔로우 통계 스타일 */
+.follow-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  transition: transform 0.2s ease;
+}
+
+.stat-item:hover {
+  transform: translateY(-2px);
+}
+
+.stat-number {
+  font-size: 1.75rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, #e2e8f0, transparent);
+}
+
 .profile-stats {
   display: flex;
   gap: 2rem;
   justify-content: center;
   margin-bottom: 1rem;
-}
-
-.stat-item {
-  text-align: center;
-}
-
-.stat-number {
-  display: block;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #667eea;
-}
-
-.stat-label {
-  font-size: 0.9rem;
-  color: #718096;
 }
 
 .follow-btn {
@@ -907,6 +973,167 @@ watch(
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+/* 팔로우 버튼 스타일 */
+.follow-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid transparent;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  min-width: 120px;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+/* 팔로우 상태별 스타일 */
+.follow-button:not(.following) {
+  background: linear-gradient(135deg, #38b2ac 0%, #319795 100%);
+  color: white;
+  border-color: #38b2ac;
+  box-shadow: 0 4px 12px rgba(56, 178, 172, 0.4);
+}
+
+.follow-button:not(.following):hover:not(:disabled) {
+  background: linear-gradient(135deg, #2c7a7b 0%, #285e61 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(44, 122, 123, 0.5);
+}
+
+.follow-button.following {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  color: #2d3748;
+  border-color: #a0aec0;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.follow-button.following:hover:not(:disabled) {
+  background: linear-gradient(135deg, #fef2f2 0%, #fed7d7 100%);
+  border-color: #fc8181;
+  color: #c53030;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(197, 48, 48, 0.3);
+}
+
+.follow-button.following:hover .follow-text {
+  color: #c53030;
+  font-weight: 700;
+}
+
+.follow-button.following:hover .follow-icon {
+  transform: scale(1.1);
+}
+
+/* 로딩 상태 */
+.follow-button.loading {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.follow-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 아이콘 스타일 */
+.follow-icon {
+  font-size: 1.1rem;
+  transition: transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.follow-text {
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  transition: color 0.2s ease;
+}
+
+/* 로딩 스피너 */
+.loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 클릭 효과 */
+.follow-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  transition: transform 0.1s ease;
+}
+
+/* 상태 변경 애니메이션 */
+.follow-button.following .follow-icon {
+  animation: followSuccess 0.6s ease-out;
+}
+
+.follow-button:not(.following) .follow-icon {
+  animation: unfollowPulse 0.4s ease-out;
+}
+
+@keyframes followSuccess {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3) rotate(10deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes unfollowPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 호버 시 텍스트 변경 효과 - 중복 제거 */
+.follow-button.following:hover .follow-text {
+  position: relative;
+}
+
+/* 포커스 스타일 */
+.follow-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(56, 178, 172, 0.3);
+}
+
+.follow-button.following:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3);
 }
 
 /* 프로필 상세 정보 */
@@ -1266,8 +1493,34 @@ watch(
     margin-bottom: 1.5rem;
   }
 
-  .profile-stats {
+  .profile-header {
+    flex-direction: column;
+    align-items: center;
     gap: 1rem;
+  }
+
+  .username {
+    text-align: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .follow-stats {
+    gap: 1.5rem;
+    padding: 0.75rem;
+  }
+
+  .stat-number {
+    font-size: 1.5rem;
+  }
+
+  .stat-divider {
+    height: 30px;
+  }
+
+  .follow-button {
+    min-width: 110px;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.85rem;
   }
 
   .tabs-header {
@@ -1321,6 +1574,40 @@ watch(
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
+  }
+
+  .profile-header {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .username {
+    font-size: 1.5rem;
+    text-align: center;
+  }
+
+  .follow-stats {
+    gap: 1rem;
+    padding: 0.5rem;
+    flex-direction: column;
+  }
+
+  .stat-divider {
+    width: 60px;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #e2e8f0, transparent);
+  }
+
+  .follow-button {
+    min-width: 100px;
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    gap: 0.375rem;
+  }
+
+  .follow-icon {
+    font-size: 0.9rem;
   }
 }
 </style>
