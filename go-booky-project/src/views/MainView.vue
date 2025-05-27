@@ -183,7 +183,7 @@
 
                 <div v-if="isUserMenuOpen" class="user-menu">
                   <RouterLink
-                    :to="{ name: 'Profile', params: { username: user?.username } }"
+                    :to="{ name: 'profile', params: { username: user?.username } }"
                     v-if="user?.username"
                     class="user-menu-item"
                     @click="closeUserMenu"

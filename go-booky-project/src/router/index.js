@@ -92,7 +92,7 @@ const router = createRouter({
     },
     {
       path: '/profile/:username',
-      name: 'Profile',
+      name: 'profile',
       component: () => import('@/views/profile/ProfileView.vue'),
       meta: {
         title: '프로필',
