@@ -9,25 +9,31 @@
 
       <!-- Recommended Books Slider positioned at 2/3 height -->
       <div class="books-section">
-        <div class="recommended-books">
+        <!-- 로딩 상태 표시 -->
+        <div v-if="isInitialLoading" class="books-loading">
+          <div class="loading-spinner"></div>
+          <p>도서를 불러오는 중...</p>
+        </div>
+
+        <div v-else class="recommended-books">
           <swiper
             ref="swiperRef"
             :modules="modules"
-            :slides-per-view="5"
-            :space-between="8"
+            :slides-per-view="4.5"
+            :space-between="12"
             :loop="true"
             :speed="1200"
             :effect="'slide'"
             :grab-cursor="true"
             :allow-touch-move="true"
             :breakpoints="{
-              320: { slidesPerView: 2, spaceBetween: 6 },
-              480: { slidesPerView: 2.5, spaceBetween: 6 },
-              640: { slidesPerView: 3, spaceBetween: 6 },
-              800: { slidesPerView: 3.5, spaceBetween: 6 },
-              968: { slidesPerView: 4, spaceBetween: 8 },
-              1200: { slidesPerView: 5, spaceBetween: 8 },
-              1600: { slidesPerView: 6, spaceBetween: 8 },
+              320: { slidesPerView: 1.8, spaceBetween: 8 },
+              480: { slidesPerView: 2.2, spaceBetween: 8 },
+              640: { slidesPerView: 2.8, spaceBetween: 10 },
+              800: { slidesPerView: 3.2, spaceBetween: 10 },
+              968: { slidesPerView: 3.8, spaceBetween: 12 },
+              1200: { slidesPerView: 4.5, spaceBetween: 12 },
+              1600: { slidesPerView: 5.5, spaceBetween: 15 },
             }"
             class="books-swiper"
             @swiper="onSwiper"
@@ -77,7 +83,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Navigation } from 'swiper/modules'
@@ -104,6 +110,7 @@ const books = ref([])
 const threads = ref([])
 const isBookLoading = ref(false)
 const isThreadLoading = ref(false)
+const isInitialLoading = ref(true)
 
 // 랜덤 도서 데이터 가져오기
 const fetchRandomBooks = async () => {
@@ -228,47 +235,72 @@ function setupMagneticHover() {
 }
 
 onMounted(async () => {
+  // 즉시 로고 초기 상태 설정하여 깜빡임 방지
+  gsap.set('.cover-logo', {
+    opacity: 0,
+    y: 50,
+    scale: 0.8,
+  })
+
   // API 데이터 가져오기
   await Promise.all([fetchRandomBooks(), fetchPopularThreads()])
 
-  skrollr.init()
+  // 초기 로딩 완료
+  isInitialLoading.value = false
 
-  // 로고 애니메이션 향상
-  gsap.fromTo(
-    '.cover-logo',
-    {
-      opacity: 0,
-      y: 50,
-      scale: 0.8,
-    },
-    {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      duration: 1.5,
-      ease: 'elastic.out(1, 0.5)',
-      delay: 0.5,
-    },
-  )
+  // Vue의 DOM 업데이트 완료 대기
+  await nextTick()
 
-  // 카드들 등장 애니메이션
-  gsap.fromTo(
-    '.book-card',
-    {
+  // 추가 안전 대기 시간
+  await new Promise((resolve) => setTimeout(resolve, 50))
+
+  // 이제 book-card들이 렌더링되었으므로 초기 상태 설정
+  const bookCards = document.querySelectorAll('.book-card')
+  if (bookCards.length > 0) {
+    gsap.set('.book-card', {
       opacity: 0,
       y: 30,
       rotationY: 15,
+    })
+  }
+
+  skrollr.init()
+
+  // 로고 애니메이션 향상 - 더 빠른 시작
+  gsap.to('.cover-logo', {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    duration: 1.2,
+    ease: 'elastic.out(1, 0.5)',
+    delay: 0.2,
+    onComplete: () => {
+      // 애니메이션 완료 후 float 애니메이션 활성화
+      document.querySelector('.cover-logo')?.classList.add('animated')
     },
-    {
+  })
+
+  // 카드들 등장 애니메이션 - 로고 애니메이션과 겹치도록 조정
+  if (bookCards.length > 0) {
+    gsap.to('.book-card', {
       opacity: 1,
       y: 0,
       rotationY: 0,
       duration: 0.8,
       ease: 'back.out(1.7)',
-      stagger: 0.1,
-      delay: 1,
-    },
-  )
+      stagger: 0.08,
+      delay: 0.6,
+    })
+  }
+
+  // 추천 쓰레드 섹션 애니메이션
+  gsap.to('.recommended-threads', {
+    opacity: 1,
+    y: 0,
+    duration: 0.8,
+    ease: 'power2.out',
+    delay: 1.2,
+  })
 
   // 마우스 호버 이벤트 리스너
   const swiperContainer = document.querySelector('.books-swiper')
@@ -327,8 +359,13 @@ onUnmounted(() => {
   max-width: 90vw;
   height: auto;
   filter: drop-shadow(0 6px 10px rgba(11, 61, 145, 0.2));
-  animation: float 4s ease-in-out infinite;
   transform-style: preserve-3d;
+  /* 초기 상태를 CSS로 설정하여 깜빡임 방지 */
+  opacity: 0;
+  transform: translateY(50px) scale(0.8);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
 }
 
 @keyframes float {
@@ -338,6 +375,46 @@ onUnmounted(() => {
   }
   50% {
     transform: translateY(-5%);
+  }
+}
+
+/* 로고가 애니메이션 완료 후 float 애니메이션 활성화 */
+.cover-logo.animated {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* 도서 로딩 상태 */
+.books-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #0b3d91;
+  font-family: 'Ubuntu', sans-serif;
+}
+
+.books-loading p {
+  margin-top: 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(11, 61, 145, 0.2);
+  border-top: 3px solid #0b3d91;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 
@@ -415,12 +492,18 @@ onUnmounted(() => {
   backdrop-filter: blur(15px);
   border: 1px solid rgba(11, 61, 145, 0.12);
   width: 100%;
-  max-width: 140px;
+  max-width: 180px;
   cursor: pointer;
   transform-style: preserve-3d;
   perspective: 1000px;
   position: relative;
   aspect-ratio: 3/4;
+  /* 초기 상태를 CSS로 설정하여 깜빡임 방지 */
+  opacity: 0;
+  transform: translateY(30px) rotateY(15deg);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
 }
 
 .book-card::before {
@@ -525,6 +608,12 @@ onUnmounted(() => {
   position: relative;
   z-index: 1;
   margin-top: -5vh;
+  /* 초기 상태를 CSS로 설정하여 깜빡임 방지 */
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
 }
 
 .recommended-threads h2 {
@@ -654,7 +743,7 @@ onUnmounted(() => {
   }
 
   .book-card {
-    max-width: 120px;
+    max-width: 150px;
   }
 
   .view-details {
