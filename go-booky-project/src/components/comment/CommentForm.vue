@@ -133,6 +133,7 @@ const handleSubmit = () => {
   resize: vertical;
   min-height: 80px;
   transition: border-color 0.2s;
+  box-sizing: border-box;
 }
 
 .comment-textarea:focus {
