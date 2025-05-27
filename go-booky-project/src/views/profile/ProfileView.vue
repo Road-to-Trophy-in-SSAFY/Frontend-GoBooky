@@ -578,17 +578,17 @@ const handleRemoveBook = async (bookId) => {
   }
 }
 
-const handleDeleteComment = async (commentId) => {
+const handleDeleteComment = async (comment) => {
   try {
-    await deleteComment(commentId)
+    await deleteComment(comment)
   } catch (err) {
     console.error('❌ 댓글 삭제 실패:', err)
   }
 }
 
-const handleDeleteReply = async (replyId) => {
+const handleDeleteReply = async (reply) => {
   try {
-    await deleteReply(replyId)
+    await deleteReply(reply)
   } catch (err) {
     console.error('❌ 대댓글 삭제 실패:', err)
   }
@@ -703,9 +703,17 @@ onMounted(async () => {
   await fetchProfile()
   await fetchCategories()
 
-  // 본인 프로필이면 첫 번째 탭 데이터 로드
+  // 모든 탭의 개수를 미리 가져오기 (첫 페이지만 로드)
+  try {
+    await Promise.all([fetchUserBooks(1), fetchUserComments(1), fetchUserThreads(1)])
+    console.log('✅ 모든 탭 개수 로드 완료')
+  } catch (err) {
+    console.error('❌ 탭 개수 로드 실패:', err)
+  }
+
+  // 본인 프로필이면 첫 번째 탭 활성화 (이미 데이터가 로드되어 있음)
   if (isOwnProfile.value) {
-    await setActiveTab('books')
+    activeTab.value = 'books'
   }
 })
 

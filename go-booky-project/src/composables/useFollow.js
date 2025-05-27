@@ -64,62 +64,8 @@ export function useFollow() {
     }
   }
 
-  /**
-   * 팔로우 상태 확인
-   * @param {string} username - 대상 사용자명
-   * @returns {Promise<Object>} 팔로우 정보
-   */
-  const getFollowStatus = async (username) => {
-    try {
-      const response = await api.get(`/auth/auth/profile/${username}/follow-status/`)
-      return response.data
-    } catch (error) {
-      console.error('❌ 팔로우 상태 조회 실패:', error)
-      throw error
-    }
-  }
-
-  /**
-   * 팔로워 목록 조회 (필요시 사용)
-   * @param {string} username - 대상 사용자명
-   * @param {number} page - 페이지 번호
-   * @returns {Promise<Object>} 팔로워 목록
-   */
-  const getFollowers = async (username, page = 1) => {
-    try {
-      const response = await api.get(`/auth/auth/profile/${username}/followers/`, {
-        params: { page },
-      })
-      return response.data
-    } catch (error) {
-      console.error('❌ 팔로워 목록 조회 실패:', error)
-      throw error
-    }
-  }
-
-  /**
-   * 팔로잉 목록 조회 (필요시 사용)
-   * @param {string} username - 대상 사용자명
-   * @param {number} page - 페이지 번호
-   * @returns {Promise<Object>} 팔로잉 목록
-   */
-  const getFollowing = async (username, page = 1) => {
-    try {
-      const response = await api.get(`/auth/auth/profile/${username}/following/`, {
-        params: { page },
-      })
-      return response.data
-    } catch (error) {
-      console.error('❌ 팔로잉 목록 조회 실패:', error)
-      throw error
-    }
-  }
-
   return {
     isLoading,
     toggleFollow,
-    getFollowStatus,
-    getFollowers,
-    getFollowing,
   }
 }

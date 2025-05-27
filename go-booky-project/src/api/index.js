@@ -74,12 +74,12 @@ api.interceptors.response.use(
       originalRequest._retry = true
 
       // 로그아웃 요청의 401은 정상적인 경우
-      if (originalRequest.url?.includes('/auth/jwt/logout/')) {
+      if (originalRequest.url?.includes('/auth/auth/jwt/logout/')) {
         return Promise.reject(error)
       }
 
       // 토큰 갱신 요청의 401은 refresh token 만료
-      if (originalRequest.url?.includes('/auth/jwt/refresh/')) {
+      if (originalRequest.url?.includes('/auth/auth/jwt/refresh/')) {
         const { useAuthStore } = await import('@/stores/auth')
         const authStore = useAuthStore()
         authStore.resetAuth()
@@ -129,9 +129,9 @@ api.interceptors.response.use(
     // 전역 오류 처리 - 특정 엔드포인트는 Toast 표시 제외
     if (error.response) {
       const skipToastUrls = [
-        '/auth/jwt/login/',
-        '/auth/jwt/refresh/',
-        '/auth/jwt/logout/',
+        '/auth/auth/jwt/login/',
+        '/auth/auth/jwt/refresh/',
+        '/auth/auth/jwt/logout/',
         '/auth/auth/signup/',
         '/auth/auth/verify-email/',
       ]
